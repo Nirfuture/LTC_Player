@@ -1,0 +1,86 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:LtcPlayer.Avalonia" xmlns:core="using:LtcPlayer.App" x:Class="LtcPlayer.Avalonia.MainWindow" Title="LTC Player" WindowStartupLocation="CenterScreen" Width="1640" Height="940" MinWidth="1400" MinHeight="800" Background="#12161C">
+ <Window.Resources>
+  <local:CueDurationConverter x:Key="CueDuration"/>
+  <DataTemplate x:Key="CenteredHeader"><TextBlock Text="{Binding}" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate>
+  <!-- Sorting is disabled; reserve no space for an unused sort icon. -->
+  <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
+  <SolidColorBrush x:Key="DataGridRowSelectedBackgroundBrush">#204D70</SolidColorBrush>
+  <SolidColorBrush x:Key="DataGridRowSelectedHoveredBackgroundBrush">#285E86</SolidColorBrush>
+  <SolidColorBrush x:Key="DataGridRowSelectedUnfocusedBackgroundBrush">#243E52</SolidColorBrush>
+  <SolidColorBrush x:Key="DataGridRowSelectedHoveredUnfocusedBackgroundBrush">#2B506C</SolidColorBrush>
+  <x:Double x:Key="SliderHorizontalThumbWidth">10</x:Double>
+  <x:Double x:Key="SliderHorizontalThumbHeight">26</x:Double>
+  <CornerRadius x:Key="SliderThumbCornerRadius">1</CornerRadius>
+  <SolidColorBrush x:Key="SliderThumbBackground">#55B2F6</SolidColorBrush>
+  <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver">#8DCEFF</SolidColorBrush>
+  <SolidColorBrush x:Key="SliderThumbBackgroundPressed">#B8E1FF</SolidColorBrush>
+  <SolidColorBrush x:Key="SliderTrackValueFill">#368DCD</SolidColorBrush>
+  <SolidColorBrush x:Key="SliderTrackValueFillPointerOver">#55B2F6</SolidColorBrush>
+  <SolidColorBrush x:Key="SliderTrackValueFillPressed">#55B2F6</SolidColorBrush>
+ </Window.Resources>
+ <Window.Styles>
+  <Style Selector="Button"><Setter Property="Padding" Value="12,8"/></Style>
+  <Style Selector="TextBox"><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+  <Style Selector="DataGridColumnHeader"><Setter Property="Padding" Value="6,8"/><Setter Property="FontSize" Value="12"/><Setter Property="MinHeight" Value="38"/></Style>
+  <Style Selector="DataGridCell"><Setter Property="Padding" Value="6,4"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+  <Style Selector="TextBox.timecode"><Setter Property="Width" Value="36"/><Setter Property="MinWidth" Value="0"/><Setter Property="MinHeight" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/><Setter Property="TextAlignment" Value="Center"/><Setter Property="FontFamily" Value="Consolas"/><Setter Property="FontSize" Value="14"/></Style>
+  <Style Selector="Button.cue-play, Button.cue-stop"><Setter Property="Height" Value="32"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  <Style Selector="Slider"><Setter Property="MinHeight" Value="40"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  <Style Selector="Button#ArmButton:disabled"><Setter Property="Opacity" Value="0.45"/></Style>
+ </Window.Styles>
+ <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="22">
+  <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,16">
+   <StackPanel><TextBlock x:Name="LtcLabel" Text="--:--:--:--" FontFamily="Consolas" FontSize="30" Foreground="#8DCBFF"/></StackPanel>
+   <Button x:Name="ArmButton" Grid.Column="1" Content="配信" Click="DeliveryClick" Margin="10,0" Foreground="White">
+    <Button.Template><ControlTemplate><Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="16,10"><ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Button.Template>
+   </Button>
+   <Button x:Name="SettingsButton" Grid.Column="2" Content="設定" Click="SettingsClick"/>
+   <TextBlock x:Name="DeliveryHint" Grid.Row="1" Grid.ColumnSpan="3" HorizontalAlignment="Right" MaxWidth="760" TextWrapping="Wrap" Foreground="#E6B566" Margin="0,8,0,0" IsVisible="False"/>
+  </Grid>
+  <Grid Grid.Row="2" ColumnDefinitions="*,18,420">
+   <Border Background="#1B212A" Padding="14" CornerRadius="8">
+    <Grid RowDefinitions="Auto,*,Auto">
+     <StackPanel x:Name="EditorTools" Orientation="Horizontal" Spacing="7" Margin="0,0,0,12">
+      <Button Content="キュー追加" Click="AddClick"/><Button Content="削除" Click="DeleteClick"/><Button Content="複製" Click="CloneClick"/><Button Content="保存" Click="SaveClick"/><Button Content="読込" Click="LoadClick"/>
+     </StackPanel>
+     <DataGrid x:Name="CueGrid" Grid.Row="1" AutoGenerateColumns="False" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single" DragDrop.AllowDrop="True" GridLinesVisibility="Horizontal" RowHeight="48" HeadersVisibility="Column" HorizontalScrollBarVisibility="Auto" Background="Transparent">
+      <DataGrid.Columns>
+       <DataGridTemplateColumn Width="30"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="⠿" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="23" Cursor="SizeAll" PointerPressed="HandlePressed"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridCheckBoxColumn Header="有効" HeaderTemplate="{StaticResource CenteredHeader}" Binding="{Binding Enabled,Mode=TwoWay}" Width="56"/>
+       <DataGridTemplateColumn Header="確認" HeaderTemplate="{StaticResource CenteredHeader}" Width="90"><DataGridTemplateColumn.CellTemplate><DataTemplate>
+        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center"><Button Classes="cue-play" Content="▶" Width="34" MinWidth="0" Padding="4" FontSize="18" ToolTip.Tip="再生" Click="RowPlayClick"/><Button Classes="cue-stop" Content="■" Width="34" MinWidth="0" Padding="4" FontSize="18" ToolTip.Tip="停止" Click="RowStopClick" IsEnabled="False"/></StackPanel>
+       </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="動画" Width="*" MinWidth="180"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Name}" ToolTip.Tip="{Binding FilePath}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="開始TC" HeaderTemplate="{StaticResource CenteredHeader}" Width="190"><DataGridTemplateColumn.CellTemplate><DataTemplate x:DataType="core:CueRow"><StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <TextBox Classes="timecode" MaxLength="2" Text="{Binding Hours,Mode=TwoWay}"/><TextBlock Text=":" VerticalAlignment="Center"/><TextBox Classes="timecode" MaxLength="2" Text="{Binding Minutes,Mode=TwoWay}"/><TextBlock Text=":" VerticalAlignment="Center"/><TextBox Classes="timecode" MaxLength="2" Text="{Binding Seconds,Mode=TwoWay}"/><TextBlock Text=":" VerticalAlignment="Center"/><TextBox Classes="timecode" MaxLength="2" Text="{Binding Frames,Mode=TwoWay}"/>
+       </StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="長さ" HeaderTemplate="{StaticResource CenteredHeader}" Width="112"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Converter={StaticResource CueDuration}}" VerticalAlignment="Center" HorizontalAlignment="Center" FontFamily="Consolas" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Converter={StaticResource CueDuration}}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="fps" HeaderTemplate="{StaticResource CenteredHeader}" Width="64"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding FrameRate,StringFormat=F2}" VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FrameRate,StringFormat=F2}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="形式" HeaderTemplate="{StaticResource CenteredHeader}" Width="70"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Codec}" VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Codec}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Width="26"><DataGridTemplateColumn.CellTemplate><DataTemplate x:DataType="core:CueRow"><TextBlock Text="{Binding WarningMark}" ToolTip.Tip="{Binding Warning}" Foreground="#E6B566"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="エラー" Width="100"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Error}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Error}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+      </DataGrid.Columns>
+     </DataGrid>
+     <TextBlock x:Name="ProgramInfo" Grid.Row="2" Foreground="#99A9BA" TextWrapping="Wrap" Margin="0,10,0,0" Text="動画をドロップして登録。表示順と再生順は独立しています。"/>
+    </Grid>
+   </Border>
+   <Grid Grid.Column="2" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*">
+    <TextBlock x:Name="ModeLabel" Text="プレビュー" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,10"/>
+    <Border Grid.Row="1" Height="236" Background="Black"><local:PreviewHost x:Name="PreviewSurface"/></Border>
+    <StackPanel Grid.Row="2" Margin="0,12,0,0"><TextBlock x:Name="PreviewName" Text="キューを選択してください" TextWrapping="Wrap"/><TextBlock x:Name="PreviewTime" Text="--:--:--:-- / --:--:--:--" FontFamily="Consolas" FontSize="20" MinHeight="34" VerticalAlignment="Center" ToolTip.Tip="HH:MM:SS:FF（末尾は動画の秒内フレーム番号）"/></StackPanel>
+    <StackPanel x:Name="PreviewControls" Grid.Row="3">
+     <Slider x:Name="Seek" Minimum="0" Maximum="1" KeyUp="SeekKeyUp"/>
+
+     <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0"><TextBlock Text="音量" VerticalAlignment="Center"/><Slider x:Name="Volume" Width="220" Minimum="0" Maximum="1" Value="0.5"/><CheckBox x:Name="Mute" Content="ミュート"/></StackPanel>
+    </StackPanel>
+    <TextBlock x:Name="PreviewInfo" Grid.Row="4" TextWrapping="Wrap" Foreground="#99A9BA" Margin="0,12,0,0"/>
+    <TextBlock x:Name="RunInfo" Grid.Row="6" TextWrapping="Wrap" Margin="0,18,0,0" Foreground="#8DCBFF"/>
+   </Grid>
+  </Grid>
+  <TextBlock x:Name="Status" Grid.Row="3" Text="準備中" TextWrapping="Wrap" Margin="0,16,0,0" Foreground="#AFD5F5"/>
+ </Grid>
+</Window>
+
+
+
+

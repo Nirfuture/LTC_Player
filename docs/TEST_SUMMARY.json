@@ -1,0 +1,32 @@
+[
+  {
+    "Suite": "default-show",
+    "Count": 4,
+    "Fail": 0
+  },
+  {
+    "Suite": "delivery-operations",
+    "Count": 9,
+    "Fail": 0
+  },
+  {
+    "Suite": "phase2-adapter",
+    "Count": 12,
+    "Fail": 0
+  },
+  {
+    "Suite": "phase5",
+    "Count": 12,
+    "Fail": 0
+  },
+  {
+    "Suite": "preview-recovery",
+    "Count": 2,
+    "Fail": 0
+  },
+  {
+    "Suite": "ui-update",
+    "Count": 11,
+    "Fail": 0
+  }
+]
