@@ -74,7 +74,7 @@ public partial class MainWindow
   }
   foreach(var b in Grid.GetVisualDescendants().OfType<Button>())if(b.DataContext is CueRow row){
    bool current=previewCue==row.CueId;
-   if(b.Classes.Contains("cue-play")){b.IsEnabled=(!armed||CanManualOutput&&row.Enabled)&&!busy&&!closing&&!Preview.IsBusy;bool pause=!armed&&current&&Preview.Snapshot.State==PreviewState.Playing;b.Content=pause?"Ⅱ":"▶";ToolTip.SetTip(b,armed?"このキューを先頭から出力":pause?"一時停止":current&&Preview.Snapshot.State==PreviewState.Paused?"再開":"再生");}
+   if(b.Classes.Contains("cue-play")){b.IsEnabled=(!armed||CanManualOutput&&row.Enabled)&&!busy&&!closing&&!Preview.IsBusy;bool pause=!armed&&current&&Preview.Snapshot.State==PreviewState.Playing;if(b.Tag is not bool wasPause||wasPause!=pause){b.Tag=pause;b.Content=new PathIcon{Width=12,Height=12,Data=Geometry.Parse(pause?"M 0,0 L 4,0 L 4,12 L 0,12 Z M 8,0 L 12,0 L 12,12 L 8,12 Z":"M 1,0 L 11,6 L 1,12 Z")};}ToolTip.SetTip(b,armed?"このキューを先頭から出力":pause?"一時停止":current&&Preview.Snapshot.State==PreviewState.Paused?"再開":"再生");}
    if(b.Classes.Contains("cue-stop"))b.IsEnabled=!busy&&!closing&&(armed?CanManualOutput&&observation is {Manual:true} t&&t.CueId==row.CueId:current);
   }
  }

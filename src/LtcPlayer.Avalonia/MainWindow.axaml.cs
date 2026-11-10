@@ -38,6 +38,8 @@ public partial class MainWindow : Window
   Control<Slider>("Volume").PropertyChanged+=(_,e)=>{if(e.Property.Name=="Value")ApplyVolume();};
   Control<CheckBox>("Mute").IsCheckedChanged+=(_,_)=>ApplyVolume();
   DragDrop.AddDragOverHandler(Grid,DragOver);DragDrop.AddDropHandler(Grid,Drop);
+  Grid.PointerCaptureLost+=(_,_)=>CancelCueDrag();
+  Deactivated+=(_,_)=>CancelCueDrag();
   Grid.AddHandler(PointerMovedEvent,HandleMoved,RoutingStrategies.Tunnel,true);
   Grid.AddHandler(PointerReleasedEvent,HandleReleased,RoutingStrategies.Tunnel,true);
   var seek=Control<Slider>("Seek");
@@ -50,7 +52,7 @@ public partial class MainWindow : Window
   seek.AddHandler(PointerMovedEvent,(_,e)=>{if(scrubbing){Scrub(e);e.Handled=true;}},RoutingStrategies.Tunnel,true);
   seek.AddHandler(PointerReleasedEvent,async(_,e)=>{if(!scrubbing)return;Scrub(e);scrubbing=false;e.Pointer.Capture(null);e.Handled=true;await SeekAsync();},RoutingStrategies.Tunnel,true);
   timer.Tick+=(_,_)=>TickStatus();
-  AddHandler(KeyDownEvent,async(_,e)=>{if(e.Key==Key.Escape){e.Handled=true;if(armed)await Safe(async()=>{await RequestStopAsync(false);});else await Safe(()=>Preview.StopAsync());}},RoutingStrategies.Tunnel);
+  AddHandler(KeyDownEvent,async(_,e)=>{if(e.Key==Key.Escape){e.Handled=true;if(dragged!=null){CancelCueDrag();return;}if(armed)await Safe(async()=>{await RequestStopAsync(false);});else await Safe(()=>Preview.StopAsync());}},RoutingStrategies.Tunnel);
   Opened+=async(_,_)=>await InitializeAsync();
   Closing+=OnWindowClosing;
  }
@@ -74,6 +76,7 @@ public partial class MainWindow : Window
    else if(loadDefault)await Edit(()=>DefaultTestShow.LoadAsync(Editor));
 
 #if VERIFICATION
+   if(Program.Option("--verify-cue-ux") is {} cueUxFolder)await CueUxVerification.RunAsync(this,cueUxFolder);
    if(Program.Option("--verify-manual-output") is {} manualFolder)await ManualOutputVerification.RunAsync(this,manualFolder);
    if(Program.Option("--verify-responsive") is {} responsiveFolder)await ResponsiveVerification.RunAsync(this,responsiveFolder);
    if(Program.Option("--verify-output-mode") is {} modeFolder)await OutputModeVerification.RunAsync(this,modeFolder);
@@ -161,22 +164,20 @@ public partial class MainWindow : Window
  async void PreviewStopClick(object? s,RoutedEventArgs e)=>await Safe(()=>Preview.StopAsync());
  async Task SeekAsync(){if(!updatingSeek&&!armed)await Safe(()=>Preview.SeekAsync(Control<Slider>("Seek").Value));}
  async void SeekKeyUp(object? s,KeyEventArgs e){if(e.Key is Key.Left or Key.Right or Key.Home or Key.End or Key.PageUp or Key.PageDown){try{await SeekAsync();}finally{keyboardSeeking=false;UpdatePreview(Preview.Snapshot);}}}
- void HandlePressed(object? sender,PointerPressedEventArgs e){if(!armed&&!busy&&sender is Control c&&e.GetCurrentPoint(c).Properties.IsLeftButtonPressed){dragged=c.DataContext as CueRow;dragOrigin=e.GetPosition(Grid);dragging=false;e.Pointer.Capture(Grid);e.Handled=true;}}
+ void HandlePressed(object? sender,PointerPressedEventArgs e){if(!armed&&!busy&&sender is Control c&&e.GetCurrentPoint(c).Properties.IsLeftButtonPressed){dragged=c.DataContext as CueRow;dragOrigin=e.GetPosition(Grid);dragging=false;cueDragPointer=e.Pointer;e.Pointer.Capture(Grid);e.Handled=true;}}
  void HandleMoved(object? sender,PointerEventArgs e)
  {
   if(armed||busy||dragged==null||!e.GetCurrentPoint(Grid).Properties.IsLeftButtonPressed)return;
-  var p=e.GetPosition(Grid);if(Math.Abs(p.X-dragOrigin.X)+Math.Abs(p.Y-dragOrigin.Y)<8)return;
-  dragging=true;e.Handled=true;
+  var p=e.GetPosition(Grid);if(!dragging&&Math.Abs(p.X-dragOrigin.X)+Math.Abs(p.Y-dragOrigin.Y)<8)return;
+  dragging=true;UpdateCueInsertion(p,true);e.Handled=true;
  }
  void HandleReleased(object? sender,PointerReleasedEventArgs e)
  {
   if(dragged==null)return;var row=dragged;bool move=dragging;
-  var hit=Grid.GetVisualAt(e.GetPosition(Grid)) as Control;
-  var dest=hit?.GetSelfAndVisualAncestors().OfType<Control>().Select(c=>c.DataContext).OfType<CueRow>().FirstOrDefault();
-  int from=Editor.Rows.IndexOf(row),target=dest==null?Editor.Rows.Count-1:Editor.Rows.IndexOf(dest);
-  dragged=null;dragging=false;e.Pointer.Capture(null);e.Handled=true;
-  if(Program.Option("--diagnostic-ui") is {} log)File.AppendAllText(log,System.Text.Json.JsonSerializer.Serialize(new{kind="reorder",from,target,move,busy,armed})+Environment.NewLine);
-  if(armed||busy||!move)return;
+  if(move)UpdateCueInsertion(e.GetPosition(Grid),false);
+  int from=Editor.Rows.IndexOf(row),target=InsertionMoveIndex(from,cueInsertionSlot);
+  CancelCueDrag();e.Pointer.Capture(null);e.Handled=true;
+  if(armed||busy||!move||target<0||target==from)return;
   try{Editor.Move(row,target);RebindGrid(row);StatusMessage("表示順を変更しました。");}catch(Exception ex){StatusMessage(ex.Message);}
  }
  void DragOver(object? s,DragEventArgs e){e.DragEffects=!armed&&!busy&&e.DataTransfer.Formats.Contains(DataFormat.File)?DragDropEffects.Copy:DragDropEffects.None;e.Handled=true;}
