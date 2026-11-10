@@ -4,13 +4,9 @@ Windows 11 x64向けのプレビュー版です。
 
 ## ダウンロード
 
-「Assets」から次のファイルをダウンロードしてください。
+[Windows用アプリをダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.2/LtcPlayer-0.1.0-preview.2-win-x64.zip)
 
-| ファイル | 内容 |
-|---|---|
-| `LtcPlayer-0.1.0-preview.2-win-x64.zip` | アプリ |
-| `LtcPlayer-0.1.0-preview.2-source.zip` | 対応するソースコード |
-| `SHA256SUMS.txt` | ファイル照合用ハッシュ |
+必要なのは、このZIPだけです。
 
 実行用ZIPを展開し、フォルダー内の`LtcPlayer.Avalonia.exe`を起動してください。
 
@@ -31,3 +27,18 @@ Windows 11 x64向けのプレビュー版です。
 検証状況と未解決項目は[配布前の確認記録](https://github.com/Nirfuture/LTC_Player/blob/main/docs/releases/0.1.0-preview.2.md)を参照してください。
 
 [対応環境・ファイル形式](https://github.com/Nirfuture/LTC_Player/blob/main/docs/COMPATIBILITY.md) · [困ったとき](https://github.com/Nirfuture/LTC_Player/blob/main/docs/TROUBLESHOOTING.md)
+
+<details>
+<summary>開発・配布ファイルの照合</summary>
+
+開発する場合は、リポジトリをクローンしてください。
+
+```sh
+git clone https://github.com/Nirfuture/LTC_Player.git
+```
+
+環境の準備は[ビルド手順](https://github.com/Nirfuture/LTC_Player/blob/main/docs/BUILD.md)を参照してください。
+
+Assetsには、配布物に対応するソースの控え（`source.zip`）、照合用の`SHA256SUMS.txt`、ビルド情報の`MANIFEST.json`、署名状態の`SIGNATURES.json`も置いています。
+
+</details>
