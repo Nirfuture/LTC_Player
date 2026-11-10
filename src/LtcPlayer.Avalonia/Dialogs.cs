@@ -9,9 +9,9 @@ public static class StopDialog
 {
  public static Task<bool> ShowAsync(Window owner,bool exit)
  {
-  var keep=new Button{Content="配信を続ける",IsDefault=true,IsCancel=true};var stop=new Button{Content=exit?"配信を停止して終了":"配信を停止"};
-  var dialog=new Window{Title="配信停止の確認",Width=450,Height=180,CanResize=false,Topmost=true,WindowStartupLocation=WindowStartupLocation.CenterOwner,
-   Content=new StackPanel{Margin=new Thickness(22),Spacing=20,Children={new TextBlock{Text=exit?"配信を停止して終了しますか？":"配信を停止しますか？"},new StackPanel{Orientation=Orientation.Horizontal,Spacing=12,HorizontalAlignment=HorizontalAlignment.Right,Children={keep,stop}}}}};
+  var keep=new Button{Content="出力を続ける",IsDefault=true,IsCancel=true};var stop=new Button{Content=exit?"出力を停止して終了":"出力を停止"};
+  var dialog=new Window{Title="出力停止の確認",Width=450,Height=180,CanResize=false,Topmost=true,WindowStartupLocation=WindowStartupLocation.CenterOwner,
+   Content=new StackPanel{Margin=new Thickness(22),Spacing=20,Children={new TextBlock{Text=exit?"出力を停止して終了しますか？":"出力を停止しますか？"},new StackPanel{Orientation=Orientation.Horizontal,Spacing=12,HorizontalAlignment=HorizontalAlignment.Right,Children={keep,stop}}}}};
   keep.Click+=(_,_)=>dialog.Close(false);stop.Click+=(_,_)=>dialog.Close(true);dialog.Opened+=(_,_)=>keep.Focus();dialog.KeyDown+=(_,e)=>{if(e.Key==Key.Escape){e.Handled=true;dialog.Close(false);}};
   return dialog.ShowDialog<bool>(owner);
  }
@@ -34,7 +34,7 @@ public sealed class SettingsDialog : Window
   fields.IsEnabled=!readOnly;
   var apply=new Button{Content="適用",IsEnabled=!readOnly};var back=new Button{Content=readOnly?"閉じる":"キャンセル",IsCancel=true};
   var buttons=new StackPanel{Orientation=Orientation.Horizontal,Spacing=10,HorizontalAlignment=HorizontalAlignment.Right,Children={back,apply}};
-  Content=new StackPanel{Margin=new Thickness(20),Spacing=12,Children={new TextBlock{Text=readOnly?"配信中は設定を変更できません。":"適用するまで現在の入力は変更されません。"},new ScrollViewer{Height=530,Content=fields},error,buttons}};
+  Content=new StackPanel{Margin=new Thickness(20),Spacing=12,Children={new TextBlock{Text=readOnly?"出力中は設定を変更できません。":"適用するまで現在の入力は変更されません。"},new ScrollViewer{Height=530,Content=fields},error,buttons}};
   back.Click+=(_,_)=>Close(null);
   apply.Click+=(_,_)=>{try{
    if(input.SelectedItem is not AudioDevice i||output.SelectedItem is not OutputDisplay d||rate.SelectedItem is not TimecodeRate m)throw new InvalidDataException("入出力を選択してください。");

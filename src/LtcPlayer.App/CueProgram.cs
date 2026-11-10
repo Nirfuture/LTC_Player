@@ -16,13 +16,15 @@ public sealed class CueRow : INotifyPropertyChanged
     public string Warning{get=>warning;set{warning=value;Changed();Changed(nameof(WarningMark));}}
     public string WarningMark=>Warning==""?"":"⚠";
     public string Error{get=>error;set{error=value;Changed();}}
+    public int PixelWidth{get;set;}
+    public int PixelHeight{get;set;}
     public double Duration{get;set;}
     public double FrameRate{get;set;}
     public string Codec{get;set;}="";
     public int DisplayOrder{get;set;}
     public string StartTimecode=>$"{Hours.PadLeft(2,'0')}:{Minutes.PadLeft(2,'0')}:{Seconds.PadLeft(2,'0')}:{Frames.PadLeft(2,'0')}";
     public void SetStart(string value){var p=value.Split(':',';');if(p.Length!=4)throw new InvalidDataException("開始TCの形式が不正です。");Hours=p[0];Minutes=p[1];Seconds=p[2];Frames=p[3];}
-    public CueRow CloneDisabled()=>new(){FilePath=FilePath,Hours=Hours,Minutes=Minutes,Seconds=Seconds,Frames=Frames,Enabled=false,Duration=Duration,FrameRate=FrameRate,Codec=Codec};
+    public CueRow CloneDisabled()=>new(){FilePath=FilePath,Hours=Hours,Minutes=Minutes,Seconds=Seconds,Frames=Frames,Enabled=false,PixelWidth=PixelWidth,PixelHeight=PixelHeight,Duration=Duration,FrameRate=FrameRate,Codec=Codec};
     public event PropertyChangedEventHandler? PropertyChanged;
     private void Changed([CallerMemberName]string? name=null)=>PropertyChanged?.Invoke(this,new(name));
 }
@@ -74,7 +76,7 @@ public static class ShowProgramService
     public static async Task RefreshAsync(CueRow row,CancellationToken token)
     {
         var info=await new MediaDecoder().InspectAsync(row.FilePath,token);
-        row.Duration=info.Duration;row.FrameRate=info.FrameRate;row.Codec=info.Codec;
+        row.PixelWidth=info.Width;row.PixelHeight=info.Height;row.Duration=info.Duration;row.FrameRate=info.FrameRate;row.Codec=info.Codec;
     }
     public static async Task SaveAsync(string path,IList<CueRow> rows,TimecodeRate rate)
     {

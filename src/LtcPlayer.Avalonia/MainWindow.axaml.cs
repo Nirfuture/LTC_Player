@@ -32,6 +32,7 @@ public partial class MainWindow : Window
   AddHandler(PointerPressedEvent,(_,e)=>TracePointer("press",e),RoutingStrategies.Tunnel,true);
   AddHandler(PointerReleasedEvent,(_,e)=>TracePointer("release",e),RoutingStrategies.Tunnel,true);
   Preview=new(Surface);Preview.Changed+=UpdatePreview;
+  Control<Grid>("PreviewViewport").SizeChanged+=(_,_)=>UpdatePreviewGeometry();
   Editor.Changed+=()=>{Control<TextBlock>("ProgramInfo").Text=Editor.ValidationMessage;UpdateEnabled();};
   Grid.SelectionChanged+=async(_,_)=>await SelectPreviewAsync();
   Control<Slider>("Volume").PropertyChanged+=(_,e)=>{if(e.Property.Name=="Value")ApplyVolume();};
@@ -73,6 +74,7 @@ public partial class MainWindow : Window
    else if(loadDefault)await Edit(()=>DefaultTestShow.LoadAsync(Editor));
 
 #if VERIFICATION
+   if(Program.Option("--verify-portrait-monitor") is {} portraitFolder)await PortraitMonitorVerification.RunAsync(this,portraitFolder);
    if(Program.Option("--verify-release-features") is {} featureFolder)await ReleaseFeaturesVerification.RunAsync(this,featureFolder);
    if(Program.Option("--verify-sync-recovery-output") is {} syncFolder)await SyncRecoveryVerification.RunAsync(this,syncFolder);
    if(Program.Option("--verify-preview-performance") is {} performanceFolder)await PreviewPerformanceVerification.RunAsync(this,performanceFolder);
@@ -105,7 +107,7 @@ public partial class MainWindow : Window
  void ApplyVolume()=>Preview?.SetVolume(Control<Slider>("Volume").Value,Control<CheckBox>("Mute").IsChecked==true);
  void UpdatePreview(PreviewSnapshot p)
  {
-  UpdateRowControls();UpdateActivity();if(armed)return;
+  UpdateRowControls();UpdateActivity();UpdatePreviewGeometry();if(armed)return;
   Control<TextBlock>("PreviewName").Text=p.Name==""?"キューを選択してください":p.Name;
   Control<TextBlock>("PreviewTime").Text=$"{MediaTimeDisplay.Format(p.Position,Preview.FrameRate)} / {MediaTimeDisplay.Format(p.Duration,Preview.FrameRate)}";
   Control<TextBlock>("PreviewInfo").Text=$"{p.State} / {p.Notice}";
@@ -117,7 +119,7 @@ public partial class MainWindow : Window
   bool waiting=busy||Preview.IsBusy||delivery is DeliveryState.Starting or DeliveryState.Stopping;
   Control<ProgressBar>("ActivityBar").IsVisible=waiting;
   var label=Control<TextBlock>("ActivityLabel");label.IsVisible=waiting;
-  label.Text=delivery==DeliveryState.Starting?"配信を準備中…":delivery==DeliveryState.Stopping?"配信を停止中…":Preview.IsBusy?Preview.BusyMessage:busy?"処理中…":"";
+  label.Text=delivery==DeliveryState.Starting?"出力を準備中…":delivery==DeliveryState.Stopping?"出力を停止中…":Preview.IsBusy?Preview.BusyMessage:busy?"処理中…":"";
   Control<Slider>("Seek").IsEnabled=!Preview.IsBusy&&!busy&&!armed;
  }
  void UpdateEnabled()

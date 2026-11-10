@@ -20,6 +20,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
  public bool Armed=>armed;
  public string LoadedPath=>path;
  public double FrameRate=>media?.FrameRate??0;
+ public (int Width,int Height) MediaSize=>(media?.Width??0,media?.Height??0);
  public event Action<PreviewSnapshot>? Changed;
  public PreviewPlayer(PreviewHost host)=>this.host=host;
  public void SetVolume(double value,bool mute){volume=(float)Math.Clamp(value,0,1);muted=mute;if(audio!=null)audio.Gain=muted?0:volume;}

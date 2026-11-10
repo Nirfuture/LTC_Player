@@ -31,7 +31,7 @@
  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="22">
   <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,16">
    <StackPanel><TextBlock x:Name="LtcLabel" Text="--:--:--:--" FontFamily="Consolas" FontSize="30" Foreground="#8DCBFF"/></StackPanel>
-   <Button x:Name="ArmButton" Grid.Column="1" Content="配信" Click="DeliveryClick" Margin="10,0" Foreground="White">
+   <Button x:Name="ArmButton" Grid.Column="1" Content="出力開始" Click="DeliveryClick" Margin="10,0" Foreground="White">
     <Button.Template><ControlTemplate><Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="16,10"><ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Button.Template>
    </Button>
    <Button x:Name="SettingsButton" Grid.Column="2" Content="設定" Click="SettingsClick"/>
@@ -64,9 +64,15 @@
      <TextBlock x:Name="ProgramInfo" Grid.Row="2" Foreground="#99A9BA" TextWrapping="Wrap" Margin="0,10,0,0" Text="動画をドロップして登録。表示順と再生順は独立しています。"/>
     </Grid>
    </Border>
-   <Grid Grid.Column="2" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*">
-    <TextBlock x:Name="ModeLabel" Text="プレビュー" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,10"/>
-    <Border Grid.Row="1" Height="236" Background="Black"><local:PreviewHost x:Name="PreviewSurface"/></Border>
+   <Grid Grid.Column="2" RowDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto">
+    <StackPanel Margin="0,0,0,10" Spacing="4">
+     <TextBlock x:Name="ModeLabel" Text="プレビュー" FontSize="17" FontWeight="SemiBold"/>
+     <TextBlock x:Name="OutputGeometry" Foreground="#8DCBFF"/>
+     <TextBlock x:Name="VideoGeometry" Foreground="#C8D4E0"/>
+    </StackPanel>
+    <Grid x:Name="PreviewViewport" Grid.Row="1" MinHeight="160" Background="#252E39" ClipToBounds="True">
+     <Border x:Name="OutputFrame" Background="Black" BorderBrush="#55B2F6" BorderThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"><local:PreviewHost x:Name="PreviewSurface"/></Border>
+    </Grid>
     <StackPanel Grid.Row="2" Margin="0,12,0,0"><ProgressBar x:Name="ActivityBar" Height="4" IsIndeterminate="True" IsVisible="False" Margin="0,0,0,6"/><TextBlock x:Name="ActivityLabel" IsVisible="False" Foreground="#8DCBFF" Margin="0,0,0,6"/><TextBlock x:Name="PreviewName" Text="キューを選択してください" TextWrapping="Wrap"/><TextBlock x:Name="PreviewTime" Text="--:--:--:-- / --:--:--:--" FontFamily="Consolas" FontSize="20" MinHeight="34" VerticalAlignment="Center" ToolTip.Tip="HH:MM:SS:FF（末尾は動画の秒内フレーム番号）"/></StackPanel>
     <StackPanel x:Name="PreviewControls" Grid.Row="3">
      <Slider x:Name="Seek" Minimum="0" Maximum="1" KeyUp="SeekKeyUp"/>
@@ -74,7 +80,7 @@
      <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0"><TextBlock Text="音量" VerticalAlignment="Center"/><Slider x:Name="Volume" Width="220" Minimum="0" Maximum="1" Value="0.5"/><CheckBox x:Name="Mute" Content="ミュート"/></StackPanel>
     </StackPanel>
     <TextBlock x:Name="PreviewInfo" Grid.Row="4" TextWrapping="Wrap" Foreground="#99A9BA" Margin="0,12,0,0"/>
-    <TextBlock x:Name="RunInfo" Grid.Row="6" TextWrapping="Wrap" Margin="0,18,0,0" Foreground="#8DCBFF"/>
+    <TextBlock x:Name="RunInfo" Grid.Row="6" ToolTip.Tip="スキップフレーム数：LTCの現在位置に追いつくため、再生せずに飛ばした動画フレーム数です。29.97 DFのタイムコード番号省略とは別です。" TextWrapping="Wrap" Margin="0,18,0,0" Foreground="#8DCBFF"/>
    </Grid>
   </Grid>
   <TextBlock x:Name="Status" Grid.Row="3" Text="準備中" TextWrapping="Wrap" Margin="0,16,0,0" Foreground="#AFD5F5"/>

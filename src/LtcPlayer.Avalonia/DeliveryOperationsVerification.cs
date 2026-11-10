@@ -39,7 +39,7 @@ public static class DeliveryOperationsVerification
    });
    await Test("button click starts without LTC / double click guarded / stream locks preview",async()=>{
     int receiving=0,index=15;await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF"),async(clock,token)=>{while(!token.IsCancellationRequested){if(Volatile.Read(ref receiving)!=0){int f=Interlocked.Increment(ref index)%200;clock.Accept(new TcFrame{Seconds=f/30,Frame=f%30,Drop=1},MasterClock.Timestamp());}await Task.Delay(33,token);}});
-    Click();Click();await Until(()=>w.Delivery==DeliveryState.Streaming&&w.LatestObservation?.Presented>2);Check(button.IsEnabled&&Equals(button.Content,"配信停止"),"stop button disabled");Check(!w.FindControl<DataGrid>("CueGrid")!.IsEnabled&&!w.FindControl<StackPanel>("PreviewControls")!.IsVisible&&w.Surface.ProgramMode,"stream controls unlocked");Check(w.LatestObservation!.State==SyncState.WAITING,"source unexpectedly active");
+    Click();Click();await Until(()=>w.Delivery==DeliveryState.Streaming&&w.LatestObservation?.Presented>2);Check(button.IsEnabled&&Equals(button.Content,"出力停止"),"stop button disabled");Check(!w.FindControl<DataGrid>("CueGrid")!.IsEnabled&&!w.FindControl<StackPanel>("PreviewControls")!.IsVisible&&w.Surface.ProgramMode,"stream controls unlocked");Check(w.LatestObservation!.State==SyncState.WAITING,"source unexpectedly active");
     Volatile.Write(ref receiving,1);await Until(()=>w.LatestObservation?.FramePts>0&&w.LatestObservation?.Monitor?.Presented>2);return new{State=State(),Observation=w.LatestObservation};
    });
    await Test("stop button cancel preserves output / accept returns ready / restart",async()=>{

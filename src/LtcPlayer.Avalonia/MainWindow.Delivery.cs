@@ -32,21 +32,21 @@ public partial class MainWindow
  {
   var clock=monitor.Clock.Read();Control<TextBlock>("LtcLabel").Text=clock.Label;
   Control<TextBlock>("LtcLabel").Opacity=clock.State is SyncState.LOST or SyncState.ERROR?.45:1;
-  if(armed&&observation is {} t){var cue=Editor.Rows.FirstOrDefault(c=>c.CueId==t.CueId);Control<TextBlock>("PreviewName").Text=CueName(t.CueId);Control<TextBlock>("PreviewTime").Text=MediaTimeDisplay.Format(t.FramePts,cue?.FrameRate??0);Control<TextBlock>("RunInfo").Text=$"現在 {CueName(t.CueId)}\n次 {CueName(t.PreloadId)}\n提示 {t.Presented} / 読み飛ばし {t.Skipped}\n{t.Warning}";}
-  UpdateRowControls();
+  if(armed&&observation is {} t){var cue=Editor.Rows.FirstOrDefault(c=>c.CueId==t.CueId);Control<TextBlock>("PreviewName").Text=CueName(t.CueId);Control<TextBlock>("PreviewTime").Text=MediaTimeDisplay.Format(t.FramePts,cue?.FrameRate??0);Control<TextBlock>("RunInfo").Text=$"出力中 {CueName(t.CueId)}\n次の動画 {CueName(t.PreloadId)}\nスキップフレーム数 {t.Skipped}\n{t.Warning}";}
+  UpdateRowControls();UpdatePreviewGeometry();
  }
  void UpdateDeliveryButton()
  {
-  var button=Control<Button>("ArmButton");button.Content=delivery switch{DeliveryState.Starting=>"配信準備中",DeliveryState.Stopping=>"停止中",DeliveryState.Streaming or DeliveryState.ConfirmingStop=>"配信停止",_=>"配信"};
+  var button=Control<Button>("ArmButton");button.Content=delivery switch{DeliveryState.Starting=>"出力準備中",DeliveryState.Stopping=>"停止中",DeliveryState.Streaming or DeliveryState.ConfirmingStop=>"出力停止",_=>"出力開始"};
   button.Background=new SolidColorBrush(Color.Parse(delivery is DeliveryState.Streaming or DeliveryState.ConfirmingStop?"#BC303A":"#303844"));
   string reason=DeliveryBlockReason();
   button.IsEnabled=!busy&&!closing&&(delivery is DeliveryState.Streaming || delivery==DeliveryState.Stopped&&reason=="");
-  ToolTip.SetTip(button,reason==""?(delivery==DeliveryState.Streaming?"配信を停止します（確認あり）":"LTCに同期して配信を開始します"):reason);
-  var hint=Control<TextBlock>("DeliveryHint");hint.IsVisible=delivery==DeliveryState.Stopped&&reason!="";hint.Text=hint.IsVisible?"配信できません："+reason:"";
-  Control<TextBlock>("ModeLabel").Text=delivery==DeliveryState.Starting?"配信準備中":armed?"配信中":"プレビュー";
+  ToolTip.SetTip(button,reason==""?(delivery==DeliveryState.Streaming?"出力を停止します（確認あり）":"LTCに同期して出力を開始します"):reason);
+  var hint=Control<TextBlock>("DeliveryHint");hint.IsVisible=delivery==DeliveryState.Stopped&&reason!="";hint.Text=hint.IsVisible?"出力できません："+reason:"";
+  Control<TextBlock>("ModeLabel").Text=delivery==DeliveryState.Starting?"出力準備中":armed?"出力中":"プレビュー";
   if(armed)Control<TextBlock>("PreviewInfo").Text="本番映像モニター（無音）";
   Control<Button>("SettingsButton").IsEnabled=delivery is DeliveryState.Stopped or DeliveryState.Streaming;
-  UpdateActivity();
+  UpdateActivity();UpdatePreviewGeometry();
  }
  internal string DeliveryBlockReason()
  {
@@ -83,7 +83,7 @@ public partial class MainWindow
  }
  internal async Task ApplySettingsAsync(SettingsResult result)
  {
-  if(armed)throw new InvalidOperationException("配信中は設定を変更できません。");
+  if(armed)throw new InvalidOperationException("出力中は設定を変更できません。");
   var mode=TimecodeRate.Modes.First(r=>r.Name==result.Settings.Rate);_=new MasterClock(mode,result.Settings.Freewheel,result.Settings.Resync);
   if(!VideoRenderer.Displays().Any(d=>d.Name==result.Display.Name&&d.Width==result.Display.Width&&d.Height==result.Display.Height))throw new InvalidDataException("指定した出力画面が接続されていません。");
   var old=settings;var oldDisplay=selectedDisplay;var oldName=selectedDisplayName;
@@ -124,19 +124,19 @@ public partial class MainWindow
    if(selectedDisplay is not {} display)throw new InvalidDataException("設定から映像出力を選択してください。");
    if(testSource!=null)await monitor.ConfigureAsync(settings,testSource);
    token.ThrowIfCancellationRequested();nint target=Surface.BeginProgram();observation=null;delivery=DeliveryState.Streaming;UpdateEnabled();
-   production=RunProductionAsync(cues,display,monitor.Clock,token,target);StatusMessage("配信中。LTCに追従します。");
+   production=RunProductionAsync(cues,display,monitor.Clock,token,target);StatusMessage("出力中。LTCに追従します。");
   }catch{await FinishProductionAsync();throw;}
   finally{prepared.TrySetResult();if(ReferenceEquals(armPrepared,prepared))armPrepared=null;}
  }
  async Task RunProductionAsync(List<ScheduledCue> cues,OutputDisplay display,MasterClock clock,CancellationToken token,nint target)
  {
-  string final="配信を停止しました。";
+  string final="出力を停止しました。";
   try {
    using var log=new SyncRunLog();log.Write(new{kind="configuration",settings,display,hostSeconds=MasterClock.Timestamp()});
    await Task.Run(()=>new ProgramPlayback(new UiDispatcher()).RunAsync(cues,display,clock,settings.Offset/Editor.Rate.Fps,t=>{observation=t;log.Write(new{kind="programObservation",t});},token,false,target,
     ()=>Dispatcher.UIThread.Post(()=>_ = Safe(async()=>{await RequestStopAsync(false);})),
-    error=>Dispatcher.UIThread.Post(()=>{Control<TextBlock>("PreviewInfo").Text="配信モニターのエラー: "+error;})));
-  }catch(OperationCanceledException){}catch(Exception e){final="配信エラー: "+e.Message;}
+    error=>Dispatcher.UIThread.Post(()=>{Control<TextBlock>("PreviewInfo").Text="出力モニターのエラー: "+error;})));
+  }catch(OperationCanceledException){}catch(Exception e){final="出力エラー: "+e.Message;}
   finally{await FinishProductionAsync();StatusMessage(final);}
  }
  async Task FinishProductionAsync()
