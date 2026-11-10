@@ -14,6 +14,9 @@ public sealed class PreviewPlayer : IAsyncDisposable
  PreviewState state;bool armed;float volume=.5f;bool muted;
  public PreviewSnapshot Snapshot=>new(state,position,media?.Duration??0,last?.Seconds,Path.GetFileName(path),errorNotice!=""?errorNotice:audioInfo?.Notice??"",presented,audio?.Progress);
  VideoFrame? last;
+ public bool IsBusy{get;private set;}
+ public string BusyMessage{get;private set;}="";
+ void Activity(string message){IsBusy=message!="";BusyMessage=message;Notify();}
  public bool Armed=>armed;
  public string LoadedPath=>path;
  public double FrameRate=>media?.FrameRate??0;
@@ -23,7 +26,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
  public async Task LoadAsync(string file)
  {
   await commands.WaitAsync();try{
-   RejectArmed();await HaltAsync();media=null;audioInfo=null;path="";errorNotice="";state=PreviewState.Empty;last=null;host.Black();Notify();
+   RejectArmed();Activity("動画を読み込み中…");await HaltAsync();media=null;audioInfo=null;path=file;position=0;errorNotice="";state=PreviewState.Empty;last=null;host.Black();Notify();
    stillPosition=null;
    var videoTask=Task.Run(()=>decoder.InspectAsync(file,CancellationToken.None));
    var audioTask=Task.Run(()=>PreviewAudio.InspectAsync(file,CancellationToken.None));
@@ -31,7 +34,8 @@ public sealed class PreviewPlayer : IAsyncDisposable
    var info=await videoTask;var sound=await audioTask;
    media=info;audioInfo=sound;path=file;position=0;state=PreviewState.Ready;
    await StillAsync(0);Notify();
-  }finally{commands.Release();}
+  }catch(Exception e){if(!armed){media=null;audioInfo=null;path="";state=PreviewState.Empty;errorNotice=e.Message;}throw;}
+  finally{Activity("");commands.Release();}
  }
  public async Task PlayAsync()
  {
@@ -39,14 +43,15 @@ public sealed class PreviewPlayer : IAsyncDisposable
    RejectArmed();if(media==null)throw new InvalidOperationException("プレビューするキューを選んでください。");
    if(state==PreviewState.Playing)return;
    if(state==PreviewState.Paused&&loop!=null){if(audio!=null)await audio.SetPausedAsync(false,CancellationToken.None);clock.Start();state=PreviewState.Playing;Notify();return;}
-   await HaltAsync();errorNotice="";if(position>=media.Duration-.001)position=0;
+   Activity("再生を準備中…");await HaltAsync();errorNotice="";if(position>=media.Duration-.001)position=0;
    cancel=new();origin=position;clock.Reset();
    if(audioInfo!.Supported){audio=new(path,position,media.Duration,muted?0:volume);try{await audio.ReadyAsync(cancel.Token);}catch{await HaltAsync();throw;}}
    // Decode and show an initial frame before the preview audio clock starts.
    if(last==null||stillPosition!=position)await StillAsync(position);
    stillPosition=null;state=PreviewState.Playing;clock.Start();if(audio!=null)await audio.SetPausedAsync(false,cancel.Token);
    loop=RunAsync(cancel.Token);Notify();
-  }finally{commands.Release();}
+  }catch(Exception e){if(!armed){state=PreviewState.Error;errorNotice=e.Message;await HaltAsync();}throw;}
+  finally{Activity("");commands.Release();}
  }
  public async Task PauseAsync()
  {
@@ -61,9 +66,10 @@ public sealed class PreviewPlayer : IAsyncDisposable
   bool resume=false;
   await commands.WaitAsync();try{
    RejectArmed();if(media==null)return;resume=state==PreviewState.Playing;
-   await HaltAsync();position=Math.Clamp(seconds,0,Math.Max(0,media.Duration-.001));state=PreviewState.Paused;
+   Activity("再生位置を読み込み中…");await HaltAsync();position=Math.Clamp(seconds,0,Math.Max(0,media.Duration-.001));state=PreviewState.Paused;
    await StillAsync(position);Notify();
-  }finally{commands.Release();}
+  }catch(Exception e){if(!armed){state=PreviewState.Error;errorNotice=e.Message;}throw;}
+  finally{Activity("");commands.Release();}
   if(resume)await PlayAsync();
  }
  public async Task SetArmedAsync(bool value)

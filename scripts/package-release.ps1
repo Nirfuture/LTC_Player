@@ -46,7 +46,7 @@ try {
  Copy-Item -LiteralPath (Join-Path $source 'third_party/libltc') -Destination (Join-Path $corresponding 'third_party') -Recurse
  $sourceNotice="# AudioNative.dll corresponding source`n`nSource commit: $commit`n`nSee ../NOTICE.md and ../LICENSES/LGPL-3.0.txt. Rebuild AudioNative.dll using native/build-phase2.cmd with MSVC x64 and the Windows SDK. The library may be replaced by an ABI-compatible modified build.`n"
  [IO.File]::WriteAllText((Join-Path $corresponding 'README.md'),$sourceNotice)
- foreach($required in @('LtcPlayer.Avalonia.exe','LtcPlayer.Avalonia.dll','AudioNative.dll','PlayerNative.dll','TestMedia/HAP_1_1080p_2997_10s.mov','LICENSES/LGPL-3.0.txt','CorrespondingSource/third_party/libltc/COPYING')){
+ foreach($required in @('LtcPlayer.Avalonia.exe','LtcPlayer.Avalonia.dll','AudioNative.dll','PlayerNative.dll','TestMedia/HAP_1_1080p_2997_10s.mov','TestMedia/LTC_29.97DF_from-zero.wav','LICENSES/LGPL-3.0.txt','CorrespondingSource/third_party/libltc/COPYING')){
   if(-not(Test-Path -LiteralPath (Join-Path $app $required) -PathType Leaf)){throw "Missing package file: $required"}
  }
  $signatures=Join-Path $stage 'SIGNATURES.json'

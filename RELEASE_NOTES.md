@@ -1,10 +1,10 @@
-# LTC Player 0.1.0-preview.2
+# LTC Player 0.1.0-preview.3
 
 Windows 11 x64向けのプレビュー版です。
 
 ## ダウンロード
 
-[Windows用アプリをダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.2/LtcPlayer-0.1.0-preview.2-win-x64.zip)
+[Windows用アプリをダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.3/LtcPlayer-0.1.0-preview.3-win-x64.zip)
 
 必要なのは、このZIPだけです。
 
@@ -14,9 +14,11 @@ Windows 11 x64向けのプレビュー版です。
 
 ## 変更点
 
-- プレビュー再生の開始待ち時間を短縮しました。
-- 映像がLTCから遅れた場合の表示と、追いつき直す処理を追加しました。
-- クイックスタートを画像付きの短い手順に整理しました。
+- `00:00:00:00`から始まるテスト用LTC音声を同梱しました（29.97 DF、約65秒）。
+- アプリのアイコンを追加しました。
+- 二重起動を防ぎ、再度起動した場合は既存のウィンドウを表示します。
+- プレビューの読み込み・再生準備・シークや、配信準備中に動くバーを表示します。
+- 配信中のプレビューを表示領域のピクセル数に合わせ、サイズ変更にも追従するようにしました。
 
 ## 確認が必要な点
 
@@ -24,7 +26,7 @@ Windows 11 x64向けのプレビュー版です。
 
 このプレビュー版は未署名です。Smart App Controlが有効な環境では、起動をブロックされる場合があります。
 
-検証状況と未解決項目は[配布前の確認記録](https://github.com/Nirfuture/LTC_Player/blob/main/docs/releases/0.1.0-preview.2.md)を参照してください。
+検証状況と未解決項目は[配布前の確認記録](https://github.com/Nirfuture/LTC_Player/blob/main/docs/releases/0.1.0-preview.3.md)を参照してください。
 
 [対応環境・ファイル形式](https://github.com/Nirfuture/LTC_Player/blob/main/docs/COMPATIBILITY.md) · [困ったとき](https://github.com/Nirfuture/LTC_Player/blob/main/docs/TROUBLESHOOTING.md)
 

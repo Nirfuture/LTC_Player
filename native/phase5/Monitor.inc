@@ -5,7 +5,7 @@ extern "C" __declspec(dllexport) int __cdecl monitor_attach(void* handle,HWND ta
  auto o=(Output*)handle;if(!o||!IsWindow(target))return E_INVALIDARG;
  try {
   o->monitor.Reset();o->monitorImage.Reset();o->monitorTarget.Reset();o->monitorWindow=target;
-  RECT r;GetClientRect(target,&r);o->monitorWidth=std::clamp((int)r.right,1,640);o->monitorHeight=std::clamp((int)r.bottom,1,360);
+  RECT r;GetClientRect(target,&r);o->monitorWidth=std::max((int)r.right,1);o->monitorHeight=std::max((int)r.bottom,1);
   ComPtr<IDXGIFactory> factory;Check(o->swap->GetParent(IID_PPV_ARGS(&factory)));
   DXGI_SWAP_CHAIN_DESC sd={};sd.BufferDesc.Width=o->monitorWidth;sd.BufferDesc.Height=o->monitorHeight;sd.BufferDesc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
   sd.SampleDesc.Count=1;sd.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;sd.BufferCount=2;sd.OutputWindow=target;sd.Windowed=TRUE;sd.SwapEffect=DXGI_SWAP_EFFECT_DISCARD;
@@ -37,6 +37,16 @@ extern "C" __declspec(dllexport) int __cdecl monitor_update(void* handle,int for
    if(hr==DXGI_STATUS_OCCLUDED){++o->monitorOccluded;return S_FALSE;}
    Check(hr);if(hr!=S_OK)return S_FALSE;
    o->monitorPresentPending=false;++o->monitorFrames;return S_OK;
+  }
+  RECT rect={};if(!GetClientRect(o->monitorWindow,&rect))return S_FALSE;
+  int width=std::max((int)rect.right,1),height=std::max((int)rect.bottom,1);
+  if(width!=o->monitorWidth||height!=o->monitorHeight){
+   o->context->OMSetRenderTargets(0,nullptr,nullptr);o->monitorTarget.Reset();o->monitorImage.Reset();
+   Check(o->monitor->ResizeBuffers(0,width,height,DXGI_FORMAT_UNKNOWN,0));
+   D3D11_TEXTURE2D_DESC td={};td.Width=width;td.Height=height;td.MipLevels=td.ArraySize=1;
+   td.Format=DXGI_FORMAT_B8G8R8A8_UNORM;td.SampleDesc.Count=1;td.BindFlags=D3D11_BIND_RENDER_TARGET;
+   Check(o->device->CreateTexture2D(&td,nullptr,&o->monitorImage));Check(o->device->CreateRenderTargetView(o->monitorImage.Get(),nullptr,&o->monitorTarget));
+   o->monitorWidth=width;o->monitorHeight=height;
   }
   ComPtr<ID3D11ShaderResourceView> source;Check(o->device->CreateShaderResourceView(o->last.Get(),nullptr,&source));
   const float black[4]={0,0,0,1};o->context->ClearRenderTargetView(o->monitorTarget.Get(),black);

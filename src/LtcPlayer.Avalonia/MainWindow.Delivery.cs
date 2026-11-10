@@ -46,6 +46,7 @@ public partial class MainWindow
   Control<TextBlock>("ModeLabel").Text=delivery==DeliveryState.Starting?"配信準備中":armed?"配信中":"プレビュー";
   if(armed)Control<TextBlock>("PreviewInfo").Text="本番映像モニター（無音）";
   Control<Button>("SettingsButton").IsEnabled=delivery is DeliveryState.Stopped or DeliveryState.Streaming;
+  UpdateActivity();
  }
  internal string DeliveryBlockReason()
  {
@@ -61,7 +62,7 @@ public partial class MainWindow
  {
   foreach(var b in Grid.GetVisualDescendants().OfType<Button>())if(b.DataContext is CueRow row){
    bool current=previewCue==row.CueId;
-   if(b.Classes.Contains("cue-play")){b.IsEnabled=!armed&&!busy&&!closing;bool pause=current&&Preview.Snapshot.State==PreviewState.Playing;b.Content=pause?"Ⅱ":"▶";ToolTip.SetTip(b,pause?"一時停止":current&&Preview.Snapshot.State==PreviewState.Paused?"再開":"再生");}
+   if(b.Classes.Contains("cue-play")){b.IsEnabled=!armed&&!busy&&!closing&&!Preview.IsBusy;bool pause=current&&Preview.Snapshot.State==PreviewState.Playing;b.Content=pause?"Ⅱ":"▶";ToolTip.SetTip(b,pause?"一時停止":current&&Preview.Snapshot.State==PreviewState.Paused?"再開":"再生");}
    if(b.Classes.Contains("cue-stop"))b.IsEnabled=current&&!armed&&!busy&&!closing;
   }
  }

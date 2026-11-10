@@ -73,6 +73,7 @@ public partial class MainWindow : Window
    else if(loadDefault)await Edit(()=>DefaultTestShow.LoadAsync(Editor));
 
 #if VERIFICATION
+   if(Program.Option("--verify-release-features") is {} featureFolder)await ReleaseFeaturesVerification.RunAsync(this,featureFolder);
    if(Program.Option("--verify-sync-recovery-output") is {} syncFolder)await SyncRecoveryVerification.RunAsync(this,syncFolder);
    if(Program.Option("--verify-preview-performance") is {} performanceFolder)await PreviewPerformanceVerification.RunAsync(this,performanceFolder);
    if(Program.Option("--verify-phase2-adapter") is {} phase2Folder){await Phase2Verification.RunAsync(new RegressionWindow(),phase2Folder);Shutdown(RegressionApplication.Current.ExitCode);return;}
@@ -104,12 +105,20 @@ public partial class MainWindow : Window
  void ApplyVolume()=>Preview?.SetVolume(Control<Slider>("Volume").Value,Control<CheckBox>("Mute").IsChecked==true);
  void UpdatePreview(PreviewSnapshot p)
  {
-  UpdateRowControls();if(armed)return;
+  UpdateRowControls();UpdateActivity();if(armed)return;
   Control<TextBlock>("PreviewName").Text=p.Name==""?"キューを選択してください":p.Name;
   Control<TextBlock>("PreviewTime").Text=$"{MediaTimeDisplay.Format(p.Position,Preview.FrameRate)} / {MediaTimeDisplay.Format(p.Duration,Preview.FrameRate)}";
   Control<TextBlock>("PreviewInfo").Text=$"{p.State} / {p.Notice}";
   var slider=Control<Slider>("Seek");slider.Maximum=Math.Max(.001,p.Duration);
   if(!scrubbing&&!keyboardSeeking){updatingSeek=true;slider.Value=p.Position;updatingSeek=false;}
+ }
+ void UpdateActivity()
+ {
+  bool waiting=busy||Preview.IsBusy||delivery is DeliveryState.Starting or DeliveryState.Stopping;
+  Control<ProgressBar>("ActivityBar").IsVisible=waiting;
+  var label=Control<TextBlock>("ActivityLabel");label.IsVisible=waiting;
+  label.Text=delivery==DeliveryState.Starting?"配信を準備中…":delivery==DeliveryState.Stopping?"配信を停止中…":Preview.IsBusy?Preview.BusyMessage:busy?"処理中…":"";
+  Control<Slider>("Seek").IsEnabled=!Preview.IsBusy&&!busy&&!armed;
  }
  void UpdateEnabled()
  {

@@ -17,6 +17,8 @@ internal static class Program
  public static string? Option(string name){int i=Array.IndexOf(Arguments,name);return i>=0&&i+1<Arguments.Length?Arguments[i+1]:null;}
  [STAThread] public static int Main(string[] args)
  {
+  using var instance = new SingleInstance();
+  if (!instance.IsFirst) { instance.ActivateExisting(); return 0; }
   Arguments=args;
   try{return AppBuilder.Configure<PlayerApp>().UsePlatformDetect().LogToTrace().StartWithClassicDesktopLifetime(args);}
   catch(Exception e){var folder=Option("--verify-phase5");if(folder!=null){Directory.CreateDirectory(folder);File.WriteAllText(Path.Combine(folder,"startup-fatal.txt"),e.ToString());}return 1;}

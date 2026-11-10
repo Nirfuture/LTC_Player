@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:LtcPlayer.Avalonia" xmlns:core="using:LtcPlayer.App" x:Class="LtcPlayer.Avalonia.MainWindow" Title="LTC Player" WindowStartupLocation="CenterScreen" Width="1640" Height="940" MinWidth="1400" MinHeight="800" Background="#12161C">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:LtcPlayer.Avalonia" xmlns:core="using:LtcPlayer.App" x:Class="LtcPlayer.Avalonia.MainWindow" Title="LTC Player" Icon="/Assets/LtcPlayer.ico" WindowStartupLocation="CenterScreen" Width="1640" Height="940" MinWidth="1400" MinHeight="800" Background="#12161C">
  <Window.Resources>
   <local:CueDurationConverter x:Key="CueDuration"/>
   <DataTemplate x:Key="CenteredHeader"><TextBlock Text="{Binding}" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate>
@@ -67,7 +67,7 @@
    <Grid Grid.Column="2" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*">
     <TextBlock x:Name="ModeLabel" Text="プレビュー" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,10"/>
     <Border Grid.Row="1" Height="236" Background="Black"><local:PreviewHost x:Name="PreviewSurface"/></Border>
-    <StackPanel Grid.Row="2" Margin="0,12,0,0"><TextBlock x:Name="PreviewName" Text="キューを選択してください" TextWrapping="Wrap"/><TextBlock x:Name="PreviewTime" Text="--:--:--:-- / --:--:--:--" FontFamily="Consolas" FontSize="20" MinHeight="34" VerticalAlignment="Center" ToolTip.Tip="HH:MM:SS:FF（末尾は動画の秒内フレーム番号）"/></StackPanel>
+    <StackPanel Grid.Row="2" Margin="0,12,0,0"><ProgressBar x:Name="ActivityBar" Height="4" IsIndeterminate="True" IsVisible="False" Margin="0,0,0,6"/><TextBlock x:Name="ActivityLabel" IsVisible="False" Foreground="#8DCBFF" Margin="0,0,0,6"/><TextBlock x:Name="PreviewName" Text="キューを選択してください" TextWrapping="Wrap"/><TextBlock x:Name="PreviewTime" Text="--:--:--:-- / --:--:--:--" FontFamily="Consolas" FontSize="20" MinHeight="34" VerticalAlignment="Center" ToolTip.Tip="HH:MM:SS:FF（末尾は動画の秒内フレーム番号）"/></StackPanel>
     <StackPanel x:Name="PreviewControls" Grid.Row="3">
      <Slider x:Name="Seek" Minimum="0" Maximum="1" KeyUp="SeekKeyUp"/>
 
