@@ -31,7 +31,7 @@ public partial class MainWindow : Window
   AvaloniaXamlLoader.Load(this);Grid.ItemsSource=Editor.Rows;
   AddHandler(PointerPressedEvent,(_,e)=>TracePointer("press",e),RoutingStrategies.Tunnel,true);
   AddHandler(PointerReleasedEvent,(_,e)=>TracePointer("release",e),RoutingStrategies.Tunnel,true);
-  Preview=new(Surface);Preview.Changed+=UpdatePreview;
+  Preview=new(Surface);Preview.Changed+=UpdatePreview;InitializeResponsiveLayout();
   Control<Grid>("PreviewViewport").SizeChanged+=(_,_)=>UpdatePreviewGeometry();
   Editor.Changed+=()=>{Control<TextBlock>("ProgramInfo").Text=Editor.ValidationMessage;UpdateEnabled();};
   Grid.SelectionChanged+=async(_,_)=>await SelectPreviewAsync();
@@ -74,6 +74,7 @@ public partial class MainWindow : Window
    else if(loadDefault)await Edit(()=>DefaultTestShow.LoadAsync(Editor));
 
 #if VERIFICATION
+   if(Program.Option("--verify-responsive") is {} responsiveFolder)await ResponsiveVerification.RunAsync(this,responsiveFolder);
    if(Program.Option("--verify-output-mode") is {} modeFolder)await OutputModeVerification.RunAsync(this,modeFolder);
    if(Program.Option("--verify-live-startup") is {} liveFolder)await LiveStartupVerification.RunAsync(this,liveFolder);
    if(Program.Option("--verify-resume-latency") is {} latencyFolder)await ResumeLatencyVerification.RunAsync(this,latencyFolder);

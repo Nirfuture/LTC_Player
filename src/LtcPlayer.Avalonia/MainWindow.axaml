@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:LtcPlayer.Avalonia" xmlns:core="using:LtcPlayer.App" x:Class="LtcPlayer.Avalonia.MainWindow" Title="LTC Player" Icon="/Assets/LtcPlayer.ico" WindowStartupLocation="CenterScreen" Width="1640" Height="940" MinWidth="1400" MinHeight="800" Background="#12161C">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:LtcPlayer.Avalonia" xmlns:core="using:LtcPlayer.App" x:Class="LtcPlayer.Avalonia.MainWindow" Title="LTC Player" Icon="/Assets/LtcPlayer.ico" WindowStartupLocation="CenterScreen" Width="1640" Height="940" MinWidth="480" MinHeight="420" Background="#12161C">
  <Window.Resources>
   <local:CueDurationConverter x:Key="CueDuration"/>
   <DataTemplate x:Key="CenteredHeader"><TextBlock Text="{Binding}" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate>
@@ -28,17 +28,18 @@
   <Style Selector="Slider"><Setter Property="MinHeight" Value="40"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
   <Style Selector="Button#ArmButton:disabled"><Setter Property="Opacity" Value="0.45"/></Style>
  </Window.Styles>
- <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="22">
+ <Grid x:Name="MainLayout" RowDefinitions="Auto,*,Auto" Margin="22">
   <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,16">
    <StackPanel><TextBlock x:Name="LtcLabel" Text="--:--:--:--" FontFamily="Consolas" FontSize="30" Foreground="#8DCBFF"/></StackPanel>
    <Button x:Name="ArmButton" Grid.Column="1" Content="出力開始" Click="DeliveryClick" Margin="10,0" Foreground="White">
     <Button.Template><ControlTemplate><Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="16,10"><ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Button.Template>
    </Button>
    <Button x:Name="SettingsButton" Grid.Column="2" Content="設定" Click="SettingsClick"/>
-   <TextBlock x:Name="DeliveryHint" Grid.Row="1" Grid.ColumnSpan="3" HorizontalAlignment="Right" MaxWidth="760" TextWrapping="Wrap" Foreground="#E6B566" Margin="0,8,0,0" IsVisible="False"/>
+   <TextBlock x:Name="DeliveryHint" MaxHeight="70" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" Grid.Row="1" Grid.ColumnSpan="3" HorizontalAlignment="Right" MaxWidth="760" TextWrapping="Wrap" Foreground="#E6B566" Margin="0,8,0,0" IsVisible="False"/>
   </Grid>
-  <Grid Grid.Row="2" ColumnDefinitions="*,18,420">
-   <Border Background="#1B212A" Padding="14" CornerRadius="8">
+  <ScrollViewer x:Name="WorkspaceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+  <Grid x:Name="Workspace" ColumnDefinitions="*,18,420">
+   <Border x:Name="EditorPane" Background="#1B212A" Padding="14" CornerRadius="8">
     <Grid RowDefinitions="Auto,*,Auto">
      <StackPanel x:Name="EditorTools" Orientation="Horizontal" Spacing="7" Margin="0,0,0,12">
       <Button Content="キュー追加" Click="AddClick"/><Button Content="削除" Click="DeleteClick"/><Button Content="複製" Click="CloneClick"/><Button Content="保存" Click="SaveClick"/><Button Content="読込" Click="LoadClick"/>
@@ -64,7 +65,7 @@
      <TextBlock x:Name="ProgramInfo" Grid.Row="2" Foreground="#99A9BA" TextWrapping="Wrap" Margin="0,10,0,0" Text="動画をドロップして登録。表示順と再生順は独立しています。"/>
     </Grid>
    </Border>
-   <Grid Grid.Column="2" RowDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto">
+   <Grid x:Name="PreviewPane" Grid.Column="2" RowDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto">
     <StackPanel Margin="0,0,0,10" Spacing="4">
      <TextBlock x:Name="ModeLabel" Text="プレビュー" FontSize="17" FontWeight="SemiBold"/>
      <TextBlock x:Name="OutputGeometry" Foreground="#8DCBFF"/>
@@ -84,7 +85,8 @@
     <TextBlock x:Name="RunInfo" Grid.Row="6" ToolTip.Tip="スキップフレーム数：LTCの現在位置に追いつくため、再生せずに飛ばした動画フレーム数です。29.97 DFのタイムコード番号省略とは別です。" TextWrapping="Wrap" Margin="0,18,0,0" Foreground="#8DCBFF"/>
    </Grid>
   </Grid>
-  <TextBlock x:Name="Status" Grid.Row="3" Text="準備中" TextWrapping="Wrap" Margin="0,16,0,0" Foreground="#AFD5F5"/>
+  </ScrollViewer>
+  <TextBlock x:Name="Status" Grid.Row="2" MaxHeight="64" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" Text="準備中" TextWrapping="Wrap" Margin="0,16,0,0" Foreground="#AFD5F5"/>
  </Grid>
 </Window>
 

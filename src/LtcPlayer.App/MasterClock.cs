@@ -24,7 +24,7 @@ public sealed class MasterClock
     private bool received,error; private double anchor,stamp,day; private int generation; private bool resync; private string label="--:--:--:--";
     public double FreewheelSeconds { get; }
     public double ResyncFrames { get; }
-    public MasterClock(TimecodeRate rate,double freewheel=0.5,double resyncFrames=2)
+    public MasterClock(TimecodeRate rate,double freewheel=0.1,double resyncFrames=2)
     {
         if(!double.IsFinite(freewheel)||freewheel<0 || !double.IsFinite(resyncFrames)||resyncFrames<=0) throw new ArgumentOutOfRangeException();
         this.rate=rate; FreewheelSeconds=freewheel; ResyncFrames=resyncFrames;

@@ -71,7 +71,7 @@ public static class Phase5Verification
    });
    await Test("playing resize preserves audio/video session",async()=>{
     await player.LoadAsync(aac);await player.PlayAsync();await Until(()=>player.Snapshot.Position>.2);var before=player.Snapshot;
-    window.Width=1250;window.Height=850;await Task.Delay(220);window.Width=1500;window.Height=940;await Task.Delay(220);
+    window.Width=1250;window.Height=850;await Task.Delay(220);window.Width=700;window.Height=1100;await Task.Delay(220);window.Width=1500;window.Height=940;await Task.Delay(220);
     Assert(player.Snapshot.State==PreviewState.Playing&&player.Snapshot.Position>before.Position+.2&&PreviewAudio.ActiveStreams==1,"resize broke playback");return player.Snapshot;
    });
    await Test("failed load clears prior media and audio",async()=>{

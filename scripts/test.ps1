@@ -18,7 +18,7 @@ try {
  if($LASTEXITCODE -ne 0){throw 'MP3 fixture failed'}
  & ffmpeg -hide_banner -loglevel error -stream_loop 2 -i "$repo/TestMedia/HAP_1_1080p_2997_10s.mov" -c copy "$fixtures/hap-sync-30s.mov"
  if($LASTEXITCODE -ne 0){throw 'Sync fixture failed'}
- foreach($name in 'output-mode','resume-latency','portrait-monitor','release-features','sync-recovery-output','default-show','delivery-operations','phase2-adapter','ui-update','phase5','preview-recovery','monitor','preview-performance') {
+ foreach($name in 'responsive','output-mode','resume-latency','portrait-monitor','release-features','sync-recovery-output','default-show','delivery-operations','phase2-adapter','ui-update','phase5','preview-recovery','monitor','preview-performance') {
   if($name -eq 'delivery-operations'){ '{"Rate":"29.97 DF","OutputDisplayName":"MISSING-VERIFICATION-DISPLAY"}' | Set-Content "$result/$name-settings.json" }
   if($name -eq 'phase2-adapter'){New-Item -ItemType Directory "$result/$name" -Force | Out-Null;Copy-Item "$fixtures/h264-aac.mp4" "$result/$name/media.mp4"}
   $media=if($name -eq 'sync-recovery-output'){"$fixtures/hap-sync-30s.mov"}else{"$repo/TestMedia/HAP_1_1080p_2997_10s.mov"}

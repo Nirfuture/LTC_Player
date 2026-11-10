@@ -11,7 +11,7 @@ public static class OutputPresentation
         OutputPresentationMode.Compatibility=>"互換（BitBlt）",
         _=>throw new InvalidDataException("表示方式の設定が不正です。")};
 }
-public record InputSettings(string DeviceId="",string DeviceName="",int Channel=0,string Rate="25",string Start="00:00:00:00",int Offset=0,double Freewheel=0.5,double Resync=2,OutputPresentationMode OutputMode=OutputPresentationMode.Standard)
+public record InputSettings(string DeviceId="",string DeviceName="",int Channel=0,string Rate="25",string Start="00:00:00:00",int Offset=0,double Freewheel=0.1,double Resync=2,OutputPresentationMode OutputMode=OutputPresentationMode.Standard)
 {
     public static string PathName=>Path.Combine(AppContext.BaseDirectory,"phase2-settings.json");
     public static InputSettings Load(string? path=null)

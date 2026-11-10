@@ -23,7 +23,7 @@ public sealed class SettingsDialog : Window
  internal TextBlock ActiveModeLabel{get;}
  public SettingsDialog(InputSettings current,OutputDisplay? display,bool readOnly)
  {
-  Title="設定";Width=680;Height=800;CanResize=false;Topmost=true;WindowStartupLocation=WindowStartupLocation.CenterOwner;
+  Title="設定";Width=680;Height=800;MinWidth=360;MinHeight=320;CanResize=true;Topmost=true;WindowStartupLocation=WindowStartupLocation.CenterOwner;
   var inputs=AudioInputService.Devices().ToList();if(current.DeviceId!=""&&!inputs.Any(x=>x.Id==current.DeviceId))inputs.Add(new(){Id=current.DeviceId,Name=current.DeviceName+" (未接続)"});
   var input=new ComboBox{ItemsSource=inputs,HorizontalAlignment=HorizontalAlignment.Stretch};input.SelectedIndex=Math.Max(0,inputs.FindIndex(x=>x.Id==current.DeviceId));
   var displays=VideoRenderer.Displays();var output=new ComboBox{ItemsSource=displays,HorizontalAlignment=HorizontalAlignment.Stretch,SelectedIndex=Math.Max(0,Array.FindIndex(displays,d=>d.Name==display?.Name))};
@@ -38,7 +38,13 @@ public sealed class SettingsDialog : Window
   fields.IsEnabled=!readOnly;
   var apply=new Button{Content="適用",IsEnabled=!readOnly};var back=new Button{Content=readOnly?"閉じる":"キャンセル",IsCancel=true};
   var buttons=new StackPanel{Orientation=Orientation.Horizontal,Spacing=10,HorizontalAlignment=HorizontalAlignment.Right,Children={back,apply}};
-  Content=new StackPanel{Margin=new Thickness(20),Spacing=12,Children={ActiveModeLabel,new TextBlock{Text=readOnly?"出力中は設定を変更できません。":"「適用」で設定を反映します。"},new ScrollViewer{Height=530,Content=fields},error,buttons}};
+  var layout=new Grid{Margin=new Thickness(20),RowDefinitions=new RowDefinitions("Auto,Auto,*,Auto,Auto")};
+  ActiveModeLabel.Margin=new Thickness(0,0,0,10);layout.Children.Add(ActiveModeLabel);
+  var hint=new TextBlock{Text=readOnly?"出力中は設定を変更できません。":"「適用」で設定を反映します。",Margin=new Thickness(0,0,0,10),TextWrapping=global::Avalonia.Media.TextWrapping.Wrap};Grid.SetRow(hint,1);layout.Children.Add(hint);
+  var scroll=new ScrollViewer{Content=fields,HorizontalScrollBarVisibility=global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,VerticalScrollBarVisibility=global::Avalonia.Controls.Primitives.ScrollBarVisibility.Auto};Grid.SetRow(scroll,2);layout.Children.Add(scroll);
+  Grid.SetRow(error,3);error.Margin=new Thickness(0,8,0,0);layout.Children.Add(error);
+  Grid.SetRow(buttons,4);buttons.Margin=new Thickness(0,12,0,0);layout.Children.Add(buttons);Content=layout;
+  WindowPlacement.Track(this);
   back.Click+=(_,_)=>Close(null);
   apply.Click+=(_,_)=>{try{
    if(input.SelectedItem is not AudioDevice i||output.SelectedItem is not OutputDisplay d||rate.SelectedItem is not TimecodeRate m)throw new InvalidDataException("入出力を選択してください。");
