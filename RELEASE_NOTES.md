@@ -14,7 +14,7 @@ Windows 11 x64向けのプレビュー版です。
 
 実行用ZIPを展開し、フォルダー内の`LtcPlayer.Avalonia.exe`を起動してください。
 
-[初回セットアップ](https://github.com/Nirfuture/LTC_Player/blob/main/docs/SETUP.md) · [クイックスタート](https://github.com/Nirfuture/LTC_Player/blob/main/docs/QUICKSTART.md)
+[クイックスタート](https://github.com/Nirfuture/LTC_Player/blob/main/docs/QUICKSTART.md)
 
 ## 変更点
 

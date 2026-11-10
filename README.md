@@ -12,9 +12,7 @@ Windows 11 x64対応。現在はプレビュー版です。使用する環境で
 
 ## 使い方
 
-- [初回セットアップ](docs/SETUP.md)
 - [クイックスタート](docs/QUICKSTART.md)
-- [動画の登録と操作](docs/OPERATIONS.md)
 - [対応環境・ファイル形式](docs/COMPATIBILITY.md)
 - [困ったとき](docs/TROUBLESHOOTING.md)
 
