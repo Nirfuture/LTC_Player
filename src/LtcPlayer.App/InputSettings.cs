@@ -11,7 +11,7 @@ public static class OutputPresentation
         OutputPresentationMode.Compatibility=>"互換（BitBlt）",
         _=>throw new InvalidDataException("表示方式の設定が不正です。")};
 }
-public record InputSettings(string DeviceId="",string DeviceName="",int Channel=0,string Rate="25",string Start="00:00:00:00",int Offset=0,double Freewheel=0.1,double Resync=2,OutputPresentationMode OutputMode=OutputPresentationMode.Standard)
+public record InputSettings(string DeviceId="",string DeviceName="",int Channel=0,string Rate="25",string Start="00:00:00:00",int Offset=0,double Freewheel=0.1,double Resync=2,OutputPresentationMode OutputMode=OutputPresentationMode.Standard,string CoverPath="",double FadeSeconds=1)
 {
     public static string PathName=>Path.Combine(AppContext.BaseDirectory,"phase2-settings.json");
     public static InputSettings Load(string? path=null)
@@ -19,7 +19,7 @@ public record InputSettings(string DeviceId="",string DeviceName="",int Channel=
         path??=PathName;
         if(!File.Exists(path)) return new();
         var settings=JsonSerializer.Deserialize<InputSettings>(File.ReadAllText(path))??new();
-        OutputPresentation.Validate(settings.OutputMode);return settings;
+        OutputPresentation.Validate(settings.OutputMode);if(!double.IsFinite(settings.FadeSeconds)||settings.FadeSeconds<0||settings.FadeSeconds>60)throw new InvalidDataException("フェード時間は0〜60秒で指定してください。");return settings;
     }
     public void Save(string? path=null)
     {

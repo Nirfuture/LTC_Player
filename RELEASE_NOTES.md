@@ -1,10 +1,10 @@
-# LTC Player 0.1.0-preview.8
+# LTC Player 0.1.0-preview.9
 
 Windows 11 x64向けのプレビュー版です。
 
 ## ダウンロード
 
-[Windows用アプリをダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.8/LtcPlayer-0.1.0-preview.8-win-x64.zip)
+[Windows用アプリをダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.9/LtcPlayer-0.1.0-preview.9-win-x64.zip)
 
 必要なのは、このZIPだけです。
 
@@ -14,11 +14,13 @@ Windows 11 x64向けのプレビュー版です。
 
 ## 変更点
 
-- 一覧の再生・停止ボタンを図形アイコンにし、中央に揃えました。開始TCの数字と区切り文字のフォント・行の高さも揃えました。
-- キューのドラッグ中、挿入先を青い線で表示します。行の上半分・下半分で挿入位置を選べます。
-- ドラッグを一覧の外へ移動した場合やEsc・フォーカス喪失時はキャンセルします。
+- 外部出力を開始する前も、LTCに同期した映像を画面内で確認できます。LTC受信中は手動操作より同期を優先し、信号が途切れると映像を保持します。
+- 設定画面で蓋画（PNG・JPEG）を登録できます。未登録時は黒です。
+- プレビュー下の「蓋画」で、映像と蓋画を指定時間でフェード切り替えできます。0秒で即時切り替え、途中での反転にも対応します。
+- 蓋画表示中もLTC同期を続け、解除すると現在位置の映像へ戻ります。プレビューと外部出力へ同じ合成を適用します。
+- LTC停止中の確認再生は、出力開始・停止時にキューと再生位置を引き継ぎます。
 
-LTC停止中の手動出力、出力キューのハイライト、縦長画面への対応なども含みます。
+出力キューのハイライト、ドラッグ挿入線、縦長画面への対応なども含みます。
 
 ## 確認が必要な点
 
@@ -26,7 +28,7 @@ LTC停止中の手動出力、出力キューのハイライト、縦長画面�
 
 このプレビュー版は未署名です。Smart App Controlが有効な環境では、起動をブロックされる場合があります。
 
-検証状況と未解決項目は[配布前の確認記録](https://github.com/Nirfuture/LTC_Player/blob/main/docs/releases/0.1.0-preview.8.md)を参照してください。
+検証状況と未解決項目は[配布前の確認記録](https://github.com/Nirfuture/LTC_Player/blob/main/docs/releases/0.1.0-preview.9.md)を参照してください。
 
 [対応環境・ファイル形式](https://github.com/Nirfuture/LTC_Player/blob/main/docs/COMPATIBILITY.md) · [困ったとき](https://github.com/Nirfuture/LTC_Player/blob/main/docs/TROUBLESHOOTING.md)
 

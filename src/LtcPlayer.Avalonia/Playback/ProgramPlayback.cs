@@ -15,10 +15,10 @@ public record ProgramObservation(SyncState State,string Ltc,Guid? CueId,Guid? Pr
 }
 public sealed class ManualOutputControl
 {
-    public sealed record Command(long Version,Guid? CueId,bool Stop);
+    public sealed record Command(long Version,Guid? CueId,bool Stop,double Position=0,bool Hold=false);
     Command current=new(0,null,false);
     public Command Read()=>Volatile.Read(ref current);
-    public void Play(Guid cue)=>Interlocked.Exchange(ref current,new(Read().Version+1,cue,false));
+    public void Play(Guid cue,double position=0,bool hold=false)=>Interlocked.Exchange(ref current,new(Read().Version+1,cue,false,position,hold));
     public void Stop()=>Interlocked.Exchange(ref current,new(Read().Version+1,null,true));
 }
 public sealed class ProgramPlayback
@@ -43,7 +43,7 @@ public sealed class ProgramPlayback
         }
         public ValueTask DisposeAsync()=>buffer.DisposeAsync();
     }
-    public async Task RunAsync(IReadOnlyList<ScheduledCue> cues,OutputDisplay display,MasterClock clock,double offset,Action<ProgramObservation> observe,CancellationToken token,bool verify=false,nint monitorWindow=0,Action? stopRequested=null,Action<int>? monitorError=null,OutputPresentationMode outputMode=OutputPresentationMode.Standard,ManualOutputControl? manualControl=null)
+    public async Task RunAsync(IReadOnlyList<ScheduledCue> cues,OutputDisplay display,MasterClock clock,double offset,Action<ProgramObservation> observe,CancellationToken token,bool verify=false,nint monitorWindow=0,Action? stopRequested=null,Action<int>? monitorError=null,OutputPresentationMode outputMode=OutputPresentationMode.Standard,ManualOutputControl? manualControl=null,IProgramPresentation? presentation=null,CoverController? cover=null,Dictionary<string,MediaDecoder>? analysisCache=null)
     {
         OutputPresentation.Validate(outputMode);
         var scheduler=new CueScheduler(cues);VideoRenderer? renderer=null;CueFrames? active=null,preload=null,recovery=null;bool monitorFaultNotified=false;
@@ -52,7 +52,8 @@ public sealed class ProgramPlayback
         ProgramMonitorStatus? monitorStatus=null;double nextMonitorSample=0;
         long commandVersion=0;ScheduledCue? manualCue=null;double manualStarted=0,manualPosition=0;bool manualReady=false,manualHolding=false,wasManual=false;
         double nextRecovery=0;int recoveryAttempts=0;double? lag=null;
-        var analyses=new Dictionary<string,MediaDecoder>(StringComparer.OrdinalIgnoreCase);
+        var analyses=analysisCache??new Dictionary<string,MediaDecoder>(StringComparer.OrdinalIgnoreCase);
+        var coverBinding=new CoverBinding();
         MediaDecoder DecoderFor(ScheduledCue cue){
             string key=Path.GetFullPath(cue.FilePath);
             if(analyses.TryGetValue(key,out var decoder))return decoder;
@@ -67,12 +68,12 @@ public sealed class ProgramPlayback
         }
         try
         {
-            await dispatcher.InvokeAsync(()=>{renderer=new VideoRenderer(display,outputMode);if(monitorWindow!=0){renderer.EnableStopConfirmation();renderer.AttachMonitor(monitorWindow);}});
+            await dispatcher.InvokeAsync(()=>{if(presentation!=null)return;renderer=new VideoRenderer(display,outputMode);if(monitorWindow!=0){renderer.EnableStopConfirmation();renderer.AttachMonitor(monitorWindow);}});
             while(!token.IsCancellationRequested)
             {
                 // A held output still needs monitor presentation (e.g. after occlusion).
                 // GPU completion remains polled without waiting for the monitor.
-                if(monitorWindow!=0)await dispatcher.InvokeAsync(()=>{
+                if(renderer!=null&&monitorWindow!=0)await dispatcher.InvokeAsync(()=>{
                     if(renderer!.PollStopRequest())stopRequested?.Invoke();renderer.UpdateMonitor();
                     ProbeObserver?.Invoke(renderer);
                     double stamp=MasterClock.Timestamp();if(stamp>=nextMonitorSample){monitorStatus=renderer.MonitorStatus();nextMonitorSample=stamp+1;}
@@ -88,7 +89,7 @@ public sealed class ProgramPlayback
                     // Recheck on the playback thread: a click may race with LTC resumption.
                     if(unavailable){
                         if(command.Stop){manualHolding=manualCue!=null;}
-                        else if(cues.FirstOrDefault(c=>c.CueId==command.CueId) is {} requested){manualCue=requested;manualPosition=0;manualReady=false;manualHolding=false;restart=true;}
+                        else if(cues.FirstOrDefault(c=>c.CueId==command.CueId) is {} requested){manualCue=requested;manualPosition=Math.Clamp(command.Position,0,Math.Max(0,requested.Duration-1/requested.FrameRate));manualReady=false;manualHolding=command.Hold;restart=true;}
                     }
                 }
                 if(!unavailable){manualCue=null;manualHolding=false;}
@@ -149,22 +150,23 @@ public sealed class ProgramPlayback
                             }
                         }
                         if(recovery!=null)warning+=(warning==""?"":" ")+"LTCの現在位置へ再同期中です。";
-                        if(frame==null)warning="準備待ち: 前の出力を保持しています。";
-                        else {if(manual&&!manualReady){manualStarted=MasterClock.Timestamp();manualReady=true;}pixels=frame.Pixels;texture=frame;displayedId=selected.CueId;displayedPts=frame.Seconds;if(lastId==selected.CueId && lastPts==frame.Seconds)++repeated;lastId=selected.CueId;lastPts=frame.Seconds;}
+                        if(frame==null)warning="準備待ち: 直前の映像を保持しています。";
+                        else {if(manual&&!manualReady){manualStarted=MasterClock.Timestamp()-manualPosition;manualReady=true;}pixels=frame.Pixels;texture=frame;displayedId=selected.CueId;displayedPts=frame.Seconds;if(lastId==selected.CueId && lastPts==frame.Seconds)++repeated;lastId=selected.CueId;lastPts=frame.Seconds;}
                     }
                     if(pixels==black){displayedId=null;displayedPts=null;}
                 }
                 if(pixels!=null)
                 {
                     byte[]? verifiedPixels=null;
-                    await dispatcher.InvokeAsync(()=>{token.ThrowIfCancellationRequested();if(texture!=null)renderer!.Present(texture);else renderer!.Present(pixels);if(verify){if(texture?.TextureFormat is >0)verifiedPixels=renderer!.Readback();else{renderer!.Verify(pixels);verifiedPixels=pixels;}}});++presented;
+                    await dispatcher.InvokeAsync(()=>{token.ThrowIfCancellationRequested();if(presentation!=null)presentation.Present(texture??new VideoFrame(pixels,now));else{if(cover!=null)coverBinding.Apply(cover,renderer!);if(texture!=null)renderer!.Present(texture);else renderer!.Present(pixels);}if(verify){if(texture?.TextureFormat is >0)verifiedPixels=renderer!.Readback();else{renderer!.Verify(pixels);verifiedPixels=pixels;}}});++presented;
                     if(verify)verificationPixel=BitConverter.ToUInt32(verifiedPixels!,(verifiedPixels!.Length/8)*4);
                 }
-                observe(new(s.State,s.Label,displayedId,preload?.Cue.CueId,now,displayedPts,presented,skipped,repeated,seeks,warning){VerificationPixelBgra=verificationPixel,Monitor=monitorStatus,LagSeconds=lag,Recovering=recovery!=null,RecoveryAttempts=recoveryAttempts,InputGeneration=s.Generation,OutputMode=renderer!.OutputMode,Manual=manual,Holding=manualHolding});
+                else await dispatcher.InvokeAsync(()=>{if(presentation!=null)presentation.Refresh();else if(cover!=null&&coverBinding.Apply(cover,renderer!))renderer!.Redraw();});
+                observe(new(s.State,s.Label,displayedId,preload?.Cue.CueId,now,displayedPts,presented,skipped,repeated,seeks,warning){VerificationPixelBgra=verificationPixel,Monitor=monitorStatus,LagSeconds=lag,Recovering=recovery!=null,RecoveryAttempts=recoveryAttempts,InputGeneration=s.Generation,OutputMode=renderer?.OutputMode??outputMode,Manual=manual,Holding=manualHolding});
                 await Task.Delay(8,token).ConfigureAwait(false);
             }
         }
-        finally{if(active!=null)await active.DisposeAsync();if(preload!=null)await preload.DisposeAsync();if(recovery!=null)await recovery.DisposeAsync();if(renderer!=null)await dispatcher.InvokeAsync(renderer.Dispose);}
+        finally{if(active!=null)await active.DisposeAsync();if(preload!=null)await preload.DisposeAsync();if(recovery!=null)await recovery.DisposeAsync();if(renderer!=null)await dispatcher.InvokeAsync(renderer.Dispose);if(presentation!=null)await dispatcher.InvokeAsync(presentation.Dispose);}
     }
 }
 

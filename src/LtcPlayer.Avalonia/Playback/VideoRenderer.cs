@@ -10,9 +10,12 @@ public struct OutputDisplay
 [StructLayout(LayoutKind.Sequential)]
 public struct OutputBounds { public int Left, Top, Right, Bottom; }
 public record ProgramMonitorStatus(int Width,int Height,ulong Rendered,ulong Presented,ulong PresentRetries,ulong Occluded,ulong GpuBusyPolls,int LastPresentResult,int Error);
-public sealed class VideoRenderer : IDisposable
+public sealed class VideoRenderer : IDisposable,ICoverRenderer
 {
     private nint handle;
+    public void SetCover(CoverImage? image){ThreadCheck();CoverNative.Image(handle,image);}
+    public void SetCoverMix(float amount){ThreadCheck();CoverNative.Mix(handle,amount);}
+    public void Redraw(){ThreadCheck();CoverNative.Redraw(handle);UpdateMonitor();}
     private global::LtcPlayer.Avalonia.RenderCallTrace? trace;
     private int Call(string operation,Func<int> action)=>trace!=null?trace.Call(operation,action):action();
     private readonly int thread = Environment.CurrentManagedThreadId;

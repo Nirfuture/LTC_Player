@@ -1,4 +1,4 @@
-// Isolated migration probe. Player.cpp/HapGpu.inc are frozen Phase 4 copies.
+// Embedded preview host, sharing the output renderer and GPU composition pipeline.
 #include "Player.cpp"
 // A STATIC control can repaint its background over a DXGI presentation.
 // This child is exclusively owned by the video renderer; validate paint without GDI drawing.
@@ -29,7 +29,7 @@ extern "C" __declspec(dllexport) int __cdecl preview_create(HWND parent,void** r
    nullptr,0,D3D11_SDK_VERSION,&sd,&o->swap,&o->device,nullptr,&o->context));
   ComPtr<IDXGIFactory> f;Check(o->swap->GetParent(IID_PPV_ARGS(&f)));Check(f->MakeWindowAssociation(o->window,DXGI_MWA_NO_ALT_ENTER));
   D3D11_TEXTURE2D_DESC td={};td.Width=o->width;td.Height=o->height;td.MipLevels=td.ArraySize=1;
-  td.Format=sd.BufferDesc.Format;td.SampleDesc.Count=1;Check(o->device->CreateTexture2D(&td,nullptr,&o->upload));
+  td.Format=sd.BufferDesc.Format;td.SampleDesc.Count=1;td.BindFlags=D3D11_BIND_SHADER_RESOURCE;Check(o->device->CreateTexture2D(&td,nullptr,&o->upload));
   *window=o->window;*result=o.release();return S_OK;
  }catch(HRESULT hr){return hr;}catch(...){return E_OUTOFMEMORY;}
 }
@@ -50,7 +50,7 @@ extern "C" __declspec(dllexport) int __cdecl preview_resume(HWND existing,void**
    nullptr,0,D3D11_SDK_VERSION,&sd,&o->swap,&o->device,nullptr,&o->context));
   ComPtr<IDXGIFactory> f;Check(o->swap->GetParent(IID_PPV_ARGS(&f)));Check(f->MakeWindowAssociation(o->window,DXGI_MWA_NO_ALT_ENTER));
   D3D11_TEXTURE2D_DESC td={};td.Width=o->width;td.Height=o->height;td.MipLevels=td.ArraySize=1;
-  td.Format=sd.BufferDesc.Format;td.SampleDesc.Count=1;Check(o->device->CreateTexture2D(&td,nullptr,&o->upload));
+  td.Format=sd.BufferDesc.Format;td.SampleDesc.Count=1;td.BindFlags=D3D11_BIND_SHADER_RESOURCE;Check(o->device->CreateTexture2D(&td,nullptr,&o->upload));
   *result=o.release();return S_OK;
  }catch(HRESULT hr){return hr;}catch(...){return E_OUTOFMEMORY;}
 }
@@ -59,11 +59,11 @@ extern "C" __declspec(dllexport) int __cdecl preview_size(void* handle,int* widt
  int w=std::max(1L,r.right),h=std::max(1L,r.bottom);
  try {
   if(w!=o->width||h!=o->height) {
-   o->context->ClearState();o->context->Flush();o->last.Reset();o->upload.Reset();o->renderedView.Reset();o->rendered.Reset();
+   o->context->ClearState();o->context->Flush();o->last.Reset();o->baseImage.Reset();o->compositeTarget.Reset();o->compositeImage.Reset();o->upload.Reset();o->renderedView.Reset();o->rendered.Reset();
    o->vertex.Reset();o->hapShader.Reset();o->qShader.Reset();o->sampler.Reset();o->raster.Reset();
    Check(o->swap->ResizeBuffers(0,w,h,DXGI_FORMAT_UNKNOWN,0));
    D3D11_TEXTURE2D_DESC td={};td.Width=w;td.Height=h;td.MipLevels=td.ArraySize=1;
-   td.Format=DXGI_FORMAT_B8G8R8A8_UNORM;td.SampleDesc.Count=1;
+   td.Format=DXGI_FORMAT_B8G8R8A8_UNORM;td.SampleDesc.Count=1;td.BindFlags=D3D11_BIND_SHADER_RESOURCE;
    Check(o->device->CreateTexture2D(&td,nullptr,&o->upload));o->width=w;o->height=h;
   }
   *width=o->width;*height=o->height;return S_OK;

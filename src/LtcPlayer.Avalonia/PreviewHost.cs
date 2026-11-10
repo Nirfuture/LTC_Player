@@ -4,13 +4,19 @@ using Avalonia.Threading;
 using LtcPlayer.App;
 using System.Runtime.InteropServices;
 namespace LtcPlayer.Avalonia;
-public sealed class PreviewHost : NativeControlHost
+public sealed class PreviewHost : NativeControlHost,ICoverRenderer
 {
  nint renderer,window,container;
+ internal CoverController? Cover{get;set;}
+ CoverBinding coverBinding=new();VideoFrame? heldFrame;int heldWidth,heldHeight;
+ public void SetCover(CoverImage? image)=>CoverNative.Image(renderer,image);
+ public void SetCoverMix(float amount)=>CoverNative.Mix(renderer,amount);
+ public void Redraw(){if(Ready){_=PixelSize;CoverNative.Redraw(renderer);}}
+ internal void RefreshCover(){if(!Ready)return;var size=PixelSize;if((size.Width!=heldWidth||size.Height!=heldHeight)&&heldFrame!=null)Present(heldFrame);if(Cover!=null&&coverBinding.Apply(Cover,this))Redraw();}
  public bool ProgramMode{get;private set;}
  internal nint ProgramWindowForVerification=>ProgramMode?window:throw new InvalidOperationException("Not in production mode");
  public nint BeginProgram(){Dispatcher.UIThread.VerifyAccess();if(ProgramMode)throw new InvalidOperationException("Already in production mode");if(renderer!=0){N.output_destroy(renderer);renderer=0;}N.preview_window_destroy(window);window=0;Check(N.preview_child_create(container,out window));ProgramMode=true;return window;}
- public void EndProgram(){Dispatcher.UIThread.VerifyAccess();if(!ProgramMode)return;N.preview_window_destroy(window);window=0;Check(N.preview_create(container,out renderer,out window));ProgramMode=false;Black();}
+ public void EndProgram(){Dispatcher.UIThread.VerifyAccess();if(!ProgramMode)return;N.preview_window_destroy(window);window=0;Check(N.preview_create(container,out renderer,out window));coverBinding=new();ProgramMode=false;Black();}
  public bool Ready=>renderer!=0;
  public int Presents{get;private set;}
  public (int Width,int Height) PixelSize {get{Dispatcher.UIThread.VerifyAccess();Check(N.preview_size(renderer,out int w,out int h));return(w,h);}}
@@ -22,7 +28,7 @@ public sealed class PreviewHost : NativeControlHost
  public void Present(VideoFrame frame)
  {
   Dispatcher.UIThread.VerifyAccess();if(!Ready)throw new ObjectDisposedException(nameof(PreviewHost));
-  _=PixelSize;
+  var size=PixelSize;heldWidth=size.Width;heldHeight=size.Height;heldFrame=frame;if(Cover!=null)coverBinding.Apply(Cover,this);
   Check(N.output_hap(renderer,frame.Pixels,frame.Pixels.Length,frame.TextureFormat==0?640:frame.Width,frame.TextureFormat==0?360:frame.Height,frame.TextureFormat==0?3:frame.TextureFormat));Presents++;
  }
  public void Black(){if(Ready)Present(new(new byte[640*360*4],0));}

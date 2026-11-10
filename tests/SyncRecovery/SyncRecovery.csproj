@@ -6,5 +6,7 @@
   <Compile Include="../../src/LtcPlayer.App/CueProgram.cs" Link="Core/CueProgram.cs" />
   <Compile Include="../../src/LtcPlayer.Avalonia/Playback/ProgramPlayback.cs" Link="Core/ProgramPlayback.cs" />
   <Compile Include="../../src/LtcPlayer.Avalonia/Playback/SynchronizedPlayback.cs" Link="Core/SynchronizedPlayback.cs" />
+  <Compile Include="../../src/LtcPlayer.Avalonia/Playback/CoverController.cs" Link="Core/CoverController.cs" />
+  <Compile Include="../../src/LtcPlayer.Avalonia/Playback/ProgramPresentationContract.cs" Link="Core/ProgramPresentationContract.cs" />
  </ItemGroup>
 </Project>

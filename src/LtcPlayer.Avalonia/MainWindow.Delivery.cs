@@ -36,7 +36,8 @@ public partial class MainWindow
  {
   var clock=monitor.Clock.Read();Control<TextBlock>("LtcLabel").Text=clock.Label;
   Control<TextBlock>("LtcLabel").Opacity=clock.State is SyncState.LOST or SyncState.ERROR?.45:1;
-  if(armed&&observation is {} t){var cue=Editor.Rows.FirstOrDefault(c=>c.CueId==t.CueId);Control<TextBlock>("PreviewName").Text=CueName(t.CueId);Control<TextBlock>("PreviewTime").Text=MediaTimeDisplay.Format(t.FramePts,cue?.FrameRate??0);Control<TextBlock>("RunInfo").Text=$"{(t.Manual?(t.Holding?"手動出力・保持":"手動出力"):"LTC同期")} {CueName(t.CueId)}\n次の動画 {CueName(t.PreloadId)}\nスキップフレーム数 {t.Skipped}\n{t.Warning}";}
+  if((armed?observation:syncObservation) is {} t){var cue=Editor.Rows.FirstOrDefault(c=>c.CueId==t.CueId);Control<TextBlock>("PreviewName").Text=CueName(t.CueId);Control<TextBlock>("PreviewTime").Text=MediaTimeDisplay.Format(t.FramePts,cue?.FrameRate??0);Control<TextBlock>("RunInfo").Text=$"{(t.Manual?(t.Holding?"手動出力・保持":"手動出力"):"LTC同期")} {CueName(t.CueId)}\n次の動画 {CueName(t.PreloadId)}\nスキップフレーム数 {t.Skipped}\n{t.Warning}";}
+  if(!armed){Control<TextBlock>("ModeLabel").Text=SyncOwnsSurface?"LTC同期プレビュー":"プレビュー";if(SyncOwnsSurface)Control<TextBlock>("PreviewInfo").Text="LTC同期プレビュー（無音・外部出力停止中）";}
   UpdateRowControls();UpdatePreviewGeometry();
  }
  void UpdateDeliveryButton()
@@ -65,28 +66,29 @@ public partial class MainWindow
  void UpdateRowControls()
  {
   foreach(var rowControl in Grid.GetVisualDescendants().OfType<DataGridRow>()){
-   bool live=armed&&rowControl.DataContext is CueRow cue&&cue.CueId==observation?.CueId;
+   bool live=(armed||SyncOwnsSurface)&&rowControl.DataContext is CueRow cue&&cue.CueId==(armed?observation:syncObservation)?.CueId;
    rowControl.Background=live?new SolidColorBrush(Color.Parse("#205C43")):Brushes.Transparent;
    foreach(string key in new[]{"DataGridRowSelectedBackgroundBrush","DataGridRowSelectedHoveredBackgroundBrush","DataGridRowSelectedUnfocusedBackgroundBrush","DataGridRowSelectedHoveredUnfocusedBackgroundBrush"}){
     if(live)rowControl.Resources[key]=rowControl.Background!;else rowControl.Resources.Remove(key);
    }
-   ToolTip.SetTip(rowControl,live?"現在出力中のキュー":null);
+   ToolTip.SetTip(rowControl,live?(armed?"現在出力中のキュー":"現在プレビュー中のキュー"):null);
   }
   foreach(var b in Grid.GetVisualDescendants().OfType<Button>())if(b.DataContext is CueRow row){
    bool current=previewCue==row.CueId;
-   if(b.Classes.Contains("cue-play")){b.IsEnabled=(!armed||CanManualOutput&&row.Enabled)&&!busy&&!closing&&!Preview.IsBusy;bool pause=!armed&&current&&Preview.Snapshot.State==PreviewState.Playing;if(b.Tag is not bool wasPause||wasPause!=pause){b.Tag=pause;b.Content=new PathIcon{Width=12,Height=12,Data=Geometry.Parse(pause?"M 0,0 L 4,0 L 4,12 L 0,12 Z M 8,0 L 12,0 L 12,12 L 8,12 Z":"M 1,0 L 11,6 L 1,12 Z")};}ToolTip.SetTip(b,armed?"このキューを先頭から出力":pause?"一時停止":current&&Preview.Snapshot.State==PreviewState.Paused?"再開":"再生");}
-   if(b.Classes.Contains("cue-stop"))b.IsEnabled=!busy&&!closing&&(armed?CanManualOutput&&observation is {Manual:true} t&&t.CueId==row.CueId:current);
+   if(b.Classes.Contains("cue-play")){b.IsEnabled=(!armed&&!LtcHasPriority||CanManualOutput&&row.Enabled)&&!busy&&!closing&&!Preview.IsBusy;bool pause=!armed&&!SyncOwnsSurface&&current&&Preview.Snapshot.State==PreviewState.Playing;if(b.Tag is not bool wasPause||wasPause!=pause){b.Tag=pause;b.Content=new PathIcon{Width=12,Height=12,Data=Geometry.Parse(pause?"M 0,0 L 4,0 L 4,12 L 0,12 Z M 8,0 L 12,0 L 12,12 L 8,12 Z":"M 1,0 L 11,6 L 1,12 Z")};}ToolTip.SetTip(b,armed?"このキューを先頭から出力":pause?"一時停止":current&&Preview.Snapshot.State==PreviewState.Paused?"再開":"再生");}
+   if(b.Classes.Contains("cue-stop"))b.IsEnabled=!busy&&!closing&&(armed?CanManualOutput&&observation is {Manual:true} t&&t.CueId==row.CueId:current&&!LtcHasPriority&&!SyncOwnsSurface);
   }
  }
  async void RowPlayClick(object? sender,RoutedEventArgs e)
  {
   if(sender is not Button{DataContext:CueRow row})return;
-  if(armed){PlayManual(row);return;}
+  if(armed){PlayManual(row);return;}if(LtcHasPriority)return;await StopSyncPreviewAsync();if(LtcHasPriority)return;
   await Safe(async()=>{bool same=previewCue==row.CueId;rebinding=true;try{Grid.SelectedItem=row;}finally{rebinding=false;}
-   if(!same){previewCue=row.CueId;CancelScrub();await Preview.LoadAsync(row.FilePath);}
+   if(!same||!string.Equals(Preview.LoadedPath,row.FilePath,StringComparison.OrdinalIgnoreCase)){previewCue=row.CueId;CancelScrub();await Preview.LoadAsync(row.FilePath);}
+   if(LtcHasPriority){await UpdateAutoPreviewAsync();return;}
    if(same&&Preview.Snapshot.State==PreviewState.Playing)await Preview.PauseAsync();else await Preview.PlayAsync();UpdateRowControls();});
  }
- async void RowStopClick(object? sender,RoutedEventArgs e){if(armed){StopManual();return;}if(!armed&&sender is Button{DataContext:CueRow row}&&previewCue==row.CueId){CancelScrub();await Safe(()=>Preview.StopAsync());}}
+ async void RowStopClick(object? sender,RoutedEventArgs e){if(!armed&&LtcHasPriority)return;if(armed){StopManual();return;}if(!armed&&sender is Button{DataContext:CueRow row}&&previewCue==row.CueId){CancelScrub();await Safe(()=>Preview.StopAsync());}}
  async void SettingsClick(object? sender,RoutedEventArgs e)
  {
   await Safe(async()=>{
@@ -100,8 +102,9 @@ public partial class MainWindow
   OutputPresentation.Validate(result.Settings.OutputMode);
   var mode=TimecodeRate.Modes.First(r=>r.Name==result.Settings.Rate);_=new MasterClock(mode,result.Settings.Freewheel,result.Settings.Resync);
   if(!VideoRenderer.Displays().Any(d=>d.Name==result.Display.Name&&d.Width==result.Display.Width&&d.Height==result.Display.Height))throw new InvalidDataException("指定した出力画面が接続されていません。");
+  var coverImage=await CoverImageLoader.LoadAsync(result.Settings.CoverPath);if(!double.IsFinite(result.Settings.FadeSeconds)||result.Settings.FadeSeconds<0||result.Settings.FadeSeconds>60)throw new InvalidDataException("フェード時間は0〜60秒で指定してください。");
   var old=settings;var oldDisplay=selectedDisplay;var oldName=selectedDisplayName;
-  busy=true;UpdateEnabled();try{CancelScrub();await Preview.StopAsync();await monitor.ConfigureAsync(result.Settings);settings=result.Settings;selectedDisplay=result.Display;selectedDisplayName=result.Display.Name;SaveSettings();Editor.Rate=mode;Editor.Validate();StatusMessage("設定を適用しました。");}
+  busy=true;UpdateEnabled();try{CancelScrub();await StopSyncPreviewAsync();await Preview.StopAsync();await monitor.ConfigureAsync(result.Settings);settings=result.Settings;cover.Image=coverImage;coverLoadWarning="";Control<NumericUpDown>("FadeSeconds").Value=(decimal)settings.FadeSeconds;selectedDisplay=result.Display;selectedDisplayName=result.Display.Name;SaveSettings();Editor.Rate=mode;Editor.Validate();StatusMessage("設定を適用しました。");}
   catch{settings=old;selectedDisplay=oldDisplay;selectedDisplayName=oldName;await monitor.ConfigureAsync(old);throw;}
   finally{busy=false;UpdateEnabled();}
  }
@@ -123,20 +126,25 @@ public partial class MainWindow
  async void OnWindowClosing(object? sender,WindowClosingEventArgs e)
  {
   if(closeAllowed)return;e.Cancel=true;if(closing||closePending)return;closePending=true;
-  try{if(armed&&!await RequestStopAsync(true))return;closing=true;UpdateEnabled();await DisarmAsync();await Preview.DisposeAsync();await monitor.DisposeAsync();timer.Stop();closeAllowed=true;Close();}
+  try{if(armed&&!await RequestStopAsync(true))return;closing=true;UpdateEnabled();await DisarmAsync();await StopSyncPreviewAsync();coverTimer.Stop();await Preview.DisposeAsync();await monitor.DisposeAsync();timer.Stop();closeAllowed=true;Close();}
   catch(Exception ex){closing=false;StatusMessage(ex.Message);UpdateEnabled();}
   finally{closePending=false;}
  }
  internal async Task ArmAsync(Func<MasterClock,CancellationToken,Task>? testSource=null)
  {
   if(armed||busy)return;armed=true;delivery=DeliveryState.Starting;Editor.Locked=true;productionCancel=new();var token=productionCancel.Token;manualOutput=new();CancelScrub();
+  var previewHandoff=Preview.Snapshot;var syncHandoff=syncObservation;var handoffCue=previewCue;
   var prepared=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);armPrepared=prepared;UpdateEnabled();
   try {
-   await Preview.SetArmedAsync(true);token.ThrowIfCancellationRequested();Grid.CommitEdit();
+   await StopSyncPreviewAsync();await Preview.SetArmedAsync(true);token.ThrowIfCancellationRequested();Grid.CommitEdit();
    foreach(var row in Editor.Rows.Where(r=>r.Enabled))await ShowProgramService.RefreshAsync(row,token);
    var cues=ShowProgramService.Validate(Editor.Rows,Editor.Rate);if(cues.Count==0)throw new InvalidDataException("有効キューがありません。");
    if(selectedDisplay is not {} display)throw new InvalidDataException("設定から映像出力を選択してください。");
    if(testSource!=null)await monitor.ConfigureAsync(settings,testSource);
+   if(!LtcHasPriority){
+    if(syncHandoff is {CueId:{} id,FramePts:{} pts}&&cues.Any(c=>c.CueId==id))manualOutput.Play(id,pts,true);
+    else if(handoffCue is {} cueId&&cues.Any(c=>c.CueId==cueId)&&previewHandoff.State is PreviewState.Playing or PreviewState.Paused or PreviewState.Ready or PreviewState.Ended)manualOutput.Play(cueId,previewHandoff.Position,previewHandoff.State!=PreviewState.Playing);
+   }
    token.ThrowIfCancellationRequested();nint target=Surface.BeginProgram();observation=null;delivery=DeliveryState.Streaming;UpdateEnabled();
    production=RunProductionAsync(cues,display,monitor.Clock,token,target);StatusMessage("出力中。LTCに追従します。");
   }catch{await FinishProductionAsync();throw;}
@@ -149,15 +157,16 @@ public partial class MainWindow
    using var log=new SyncRunLog();log.Write(new{kind="configuration",settings,display,hostSeconds=MasterClock.Timestamp()});
    await Task.Run(()=>new ProgramPlayback(new UiDispatcher()).RunAsync(cues,display,clock,settings.Offset/Editor.Rate.Fps,t=>{observation=t;log.Write(new{kind="programObservation",t});},token,false,Program.Arguments.Contains("--diagnostic-no-monitor")?0:target,
     ()=>Dispatcher.UIThread.Post(()=>_ = Safe(async()=>{await RequestStopAsync(false);})),
-    error=>Dispatcher.UIThread.Post(()=>{Control<TextBlock>("PreviewInfo").Text="出力モニターのエラー: "+error;}),settings.OutputMode,manualOutput));
+    error=>Dispatcher.UIThread.Post(()=>{Control<TextBlock>("PreviewInfo").Text="出力モニターのエラー: "+error;}),settings.OutputMode,manualOutput,cover:cover,analysisCache:playbackAnalyses));
   }catch(OperationCanceledException){}catch(Exception e){final="出力エラー: "+e.Message;}
   finally{await FinishProductionAsync();StatusMessage(final);}
  }
  async Task FinishProductionAsync()
  {
   // ProgramPlayback disposes the borrowed monitor swap chain before this callback.
+  var heldObservation=observation;
   Surface.EndProgram();await Preview.SetArmedAsync(false);armed=false;delivery=DeliveryState.Stopped;Editor.Locked=false;productionCancel?.Dispose();productionCancel=null;observation=null;Control<TextBlock>("RunInfo").Text="";UpdateEnabled();Editor.Validate();
-  CancelScrub();UpdatePreview(Preview.Snapshot);if(!closing)await SelectPreviewAsync();
+  CancelScrub();UpdatePreview(Preview.Snapshot);if(!closing&&!closePending){if(heldObservation is {CueId:not null,FramePts:not null}&&!LtcHasPriority)await RestorePreviewAsync(heldObservation);else await SelectPreviewAsync();}
  }
  internal async Task DisarmAsync()
  {

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Input;
+using Avalonia.Platform.Storage;
 using LtcPlayer.App;
 using System.Globalization;
 namespace LtcPlayer.Avalonia;
@@ -35,6 +36,13 @@ public sealed class SettingsDialog : Window
   var fields=new StackPanel{Spacing=8};
   void Add(string label,Control c){fields.Children.Add(new TextBlock{Text=label});fields.Children.Add(c);}
   Add("LTC入力",input);Add("入力チャンネル",channel);Add("LTC形式",rate);Add("映像出力",output);Add("表示方式",ModeSelector);fields.Children.Add(new TextBlock{Text="通常は標準を使用します。全画面出力が不安定な場合は互換を選んでください。",TextWrapping=global::Avalonia.Media.TextWrapping.Wrap});Add("補正（フレーム）",offset);Add("入力喪失時の補間（秒）",freewheel);Add("再同期の閾値（フレーム）",resync);
+  string coverPath=current.CoverPath;
+  var coverName=new TextBlock{Text=coverPath==""?"未登録（黒）":Path.GetFileName(coverPath),TextWrapping=global::Avalonia.Media.TextWrapping.Wrap};
+  var chooseCover=new Button{Content="画像を選択"};var clearCover=new Button{Content="解除"};
+  var coverButtons=new StackPanel{Orientation=Orientation.Horizontal,Spacing=8,Children={chooseCover,clearCover}};
+  Add("蓋画",coverName);fields.Children.Add(coverButtons);
+  chooseCover.Click+=async(_,_)=>{var files=await StorageProvider.OpenFilePickerAsync(new(){Title="蓋画を登録",AllowMultiple=false,FileTypeFilter=[new("PNG・JPEG"){Patterns=["*.png","*.jpg","*.jpeg"]}]});if(files.FirstOrDefault()?.TryGetLocalPath() is {} path){try{await CoverImageLoader.LoadAsync(path);coverPath=path;coverName.Text=Path.GetFileName(path);error.Text="";}catch(Exception e){error.Text=e.Message;}}};
+  clearCover.Click+=(_,_)=>{coverPath="";coverName.Text="未登録（黒）";};
   fields.IsEnabled=!readOnly;
   var apply=new Button{Content="適用",IsEnabled=!readOnly};var back=new Button{Content=readOnly?"閉じる":"キャンセル",IsCancel=true};
   var buttons=new StackPanel{Orientation=Orientation.Horizontal,Spacing=10,HorizontalAlignment=HorizontalAlignment.Right,Children={back,apply}};
@@ -48,7 +56,7 @@ public sealed class SettingsDialog : Window
   back.Click+=(_,_)=>Close(null);
   apply.Click+=(_,_)=>{try{
    if(input.SelectedItem is not AudioDevice i||output.SelectedItem is not OutputDisplay d||rate.SelectedItem is not TimecodeRate m)throw new InvalidDataException("入出力を選択してください。");
-   var updated=current with{OutputMode=(OutputPresentationMode)ModeSelector.SelectedIndex,DeviceId=i.Id,DeviceName=i.Name,Channel=channel.SelectedIndex,Rate=m.Name,Offset=int.Parse(offset.Text!,CultureInfo.InvariantCulture),Freewheel=double.Parse(freewheel.Text!,CultureInfo.InvariantCulture),Resync=double.Parse(resync.Text!,CultureInfo.InvariantCulture)};
+   var updated=current with{CoverPath=coverPath,OutputMode=(OutputPresentationMode)ModeSelector.SelectedIndex,DeviceId=i.Id,DeviceName=i.Name,Channel=channel.SelectedIndex,Rate=m.Name,Offset=int.Parse(offset.Text!,CultureInfo.InvariantCulture),Freewheel=double.Parse(freewheel.Text!,CultureInfo.InvariantCulture),Resync=double.Parse(resync.Text!,CultureInfo.InvariantCulture)};
    OutputPresentation.Validate(updated.OutputMode);_=new MasterClock(m,updated.Freewheel,updated.Resync);Close(new SettingsResult(updated,d));
   }catch(Exception e){error.Text=e.Message;}};
  }

@@ -57,8 +57,7 @@ extern "C" __declspec(dllexport) int __cdecl output_hap(void* handle,const unsig
         ID3D11SamplerState* sampler=o->sampler.Get();o->context->PSSetSamplers(0,1,&sampler);o->context->Draw(3,0);
         view=nullptr;o->context->PSSetShaderResources(0,1,&view);o->context->OMSetRenderTargets(0,nullptr,nullptr);
         ComPtr<ID3D11Texture2D> back;Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));
-        o->context->CopyResource(back.Get(),o->rendered.Get());o->last=o->rendered;
-        return o->swap->Present(o->embedded?0:1,0);
+        o->baseImage=o->rendered;return PresentComposite(o);
     } catch(HRESULT hr){return hr;} catch(...){return E_OUTOFMEMORY;}
 }
 extern "C" __declspec(dllexport) int __cdecl output_readback(void* handle,unsigned char* pixels,int length) {

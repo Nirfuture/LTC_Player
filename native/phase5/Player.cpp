@@ -6,6 +6,8 @@
 #include <vector>
 #include <memory>
 #include <cstring>
+#include <algorithm>
+#include <cmath>
 using Microsoft::WRL::ComPtr;
 struct Display { int x,y,width,height,primary; wchar_t name[32]; };
 static BOOL CALLBACK Collect(HMONITOR monitor,HDC,LPRECT,LPARAM data) {
@@ -40,6 +42,12 @@ struct Output {
     ComPtr<ID3D11PixelShader> hapShader,qShader;
     ComPtr<ID3D11SamplerState> sampler;
     ComPtr<ID3D11RasterizerState> raster;
+    ComPtr<ID3D11Texture2D> baseImage,coverImage,compositeImage;
+    ComPtr<ID3D11ShaderResourceView> coverView;
+    ComPtr<ID3D11RenderTargetView> compositeTarget;
+    ComPtr<ID3D11VertexShader> compositeVertex;ComPtr<ID3D11PixelShader> compositeShader;
+    ComPtr<ID3D11RasterizerState> compositeRaster;ComPtr<ID3D11SamplerState> compositeSampler;ComPtr<ID3D11Buffer> compositeConstants;
+    float coverMix=0;int coverWidth=0,coverHeight=0,compositeWidth=0,compositeHeight=0;
     int sourceWidth=0,sourceHeight=0,sourceKind=0;
     ~Output(){if(context){context->ClearState();context->Flush();}monitor.Reset();swap.Reset();if(context)context->Flush();context.Reset();upload.Reset();device.Reset();if(ownsWindow && window && IsWindow(window))DestroyWindow(window);}
 };
@@ -86,15 +94,14 @@ extern "C" __declspec(dllexport) int __cdecl output_presentation_mode(void* hand
 }
 // Verification-only geometry: preserve full-resolution rendering without covering a live output.
 extern "C" __declspec(dllexport) int __cdecl output_create_probe(const Display* selected,void** result){return CreateOutput(selected,result,true);}
+#include "Composite.inc"
 extern "C" __declspec(dllexport) int __cdecl output_frame(void* handle,const unsigned char* pixels,int length) {
     auto o=static_cast<Output*>(handle); if(!o || !pixels || length!=o->width*o->height*4) return E_INVALIDARG;
     if(!IsWindow(o->window) || (!o->embedded && !o->confirmClose && (GetAsyncKeyState(VK_ESCAPE)&0x8000))) return HRESULT_FROM_WIN32(ERROR_CANCELLED);
     try {
         ComPtr<ID3D11Texture2D> back; Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));
         o->context->UpdateSubresource(o->upload.Get(),0,nullptr,pixels,o->width*4,0);
-        o->context->CopyResource(back.Get(),o->upload.Get());
-        o->last=o->upload;
-        return o->swap->Present(1,0);
+        o->baseImage=o->upload;return PresentComposite(o);
     } catch(HRESULT hr){return hr;}
 }
 // Verification-only readback of upload texture. Presentation is counted separately.
