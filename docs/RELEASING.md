@@ -11,7 +11,7 @@
 ビルドに必要な環境を用意し、リポジトリのルートで実行します。
 
 ```powershell
-./scripts/package-release.ps1 -Version 0.1.0-preview.4
+./scripts/package-release.ps1 -Version 0.1.0-preview.5
 ```
 
 通常のdotnetと異なる実行ファイルを使う場合は、`-DotnetPath`で指定できます。過去のコミットを指定する場合は`-Revision`を使います。ソース側のVersionと指定バージョンが一致しなければ停止します。
@@ -19,10 +19,10 @@
 生成先:
 
 ```text
-releases/0.1.0-preview.4/
+releases/0.1.0-preview.5/
 ├─ LtcPlayer/                         展開状態のアプリ
-├─ LtcPlayer-0.1.0-preview.4-win-x64.zip
-├─ LtcPlayer-0.1.0-preview.4-source.zip
+├─ LtcPlayer-0.1.0-preview.5-win-x64.zip
+├─ LtcPlayer-0.1.0-preview.5-source.zip
 ├─ SHA256SUMS.txt
 ├─ RELEASE_NOTES.md
 ├─ MANIFEST.json

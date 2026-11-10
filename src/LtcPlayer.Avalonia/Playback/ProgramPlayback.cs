@@ -9,6 +9,7 @@ public record ProgramObservation(SyncState State,string Ltc,Guid? CueId,Guid? Pr
     public bool Recovering{get;init;}
     public int RecoveryAttempts{get;init;}
     public int InputGeneration{get;init;}
+    public OutputPresentationMode OutputMode{get;init;}
 }
 public sealed class ProgramPlayback
 {
@@ -32,8 +33,9 @@ public sealed class ProgramPlayback
         }
         public ValueTask DisposeAsync()=>buffer.DisposeAsync();
     }
-    public async Task RunAsync(IReadOnlyList<ScheduledCue> cues,OutputDisplay display,MasterClock clock,double offset,Action<ProgramObservation> observe,CancellationToken token,bool verify=false,nint monitorWindow=0,Action? stopRequested=null,Action<int>? monitorError=null)
+    public async Task RunAsync(IReadOnlyList<ScheduledCue> cues,OutputDisplay display,MasterClock clock,double offset,Action<ProgramObservation> observe,CancellationToken token,bool verify=false,nint monitorWindow=0,Action? stopRequested=null,Action<int>? monitorError=null,OutputPresentationMode outputMode=OutputPresentationMode.Standard)
     {
+        OutputPresentation.Validate(outputMode);
         var scheduler=new CueScheduler(cues);VideoRenderer? renderer=null;CueFrames? active=null,preload=null,recovery=null;bool monitorFaultNotified=false;
         var black=new byte[checked(display.Width*display.Height*4)];int epoch=-1,presented=0,skipped=0,repeated=0,seeks=0;
         double? lastPts=null;Guid? lastId=null,displayedId=null;double? displayedPts=null;uint verificationPixel=0;
@@ -54,7 +56,7 @@ public sealed class ProgramPlayback
         }
         try
         {
-            await dispatcher.InvokeAsync(()=>{renderer=new VideoRenderer(display);if(monitorWindow!=0){renderer.EnableStopConfirmation();renderer.AttachMonitor(monitorWindow);}});
+            await dispatcher.InvokeAsync(()=>{renderer=new VideoRenderer(display,outputMode);if(monitorWindow!=0){renderer.EnableStopConfirmation();renderer.AttachMonitor(monitorWindow);}});
             while(!token.IsCancellationRequested)
             {
                 // A held output still needs monitor presentation (e.g. after occlusion).
@@ -132,7 +134,7 @@ public sealed class ProgramPlayback
                     await dispatcher.InvokeAsync(()=>{token.ThrowIfCancellationRequested();if(texture!=null)renderer!.Present(texture);else renderer!.Present(pixels);if(verify){if(texture?.TextureFormat is >0)verifiedPixels=renderer!.Readback();else{renderer!.Verify(pixels);verifiedPixels=pixels;}}});++presented;
                     if(verify)verificationPixel=BitConverter.ToUInt32(verifiedPixels!,(verifiedPixels!.Length/8)*4);
                 }
-                observe(new(s.State,s.Label,displayedId,preload?.Cue.CueId,now,displayedPts,presented,skipped,repeated,seeks,warning){VerificationPixelBgra=verificationPixel,Monitor=monitorStatus,LagSeconds=lag,Recovering=recovery!=null,RecoveryAttempts=recoveryAttempts,InputGeneration=s.Generation});
+                observe(new(s.State,s.Label,displayedId,preload?.Cue.CueId,now,displayedPts,presented,skipped,repeated,seeks,warning){VerificationPixelBgra=verificationPixel,Monitor=monitorStatus,LagSeconds=lag,Recovering=recovery!=null,RecoveryAttempts=recoveryAttempts,InputGeneration=s.Generation,OutputMode=renderer!.OutputMode});
                 await Task.Delay(8,token).ConfigureAwait(false);
             }
         }

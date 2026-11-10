@@ -84,6 +84,7 @@ public partial class MainWindow
  internal async Task ApplySettingsAsync(SettingsResult result)
  {
   if(armed)throw new InvalidOperationException("出力中は設定を変更できません。");
+  OutputPresentation.Validate(result.Settings.OutputMode);
   var mode=TimecodeRate.Modes.First(r=>r.Name==result.Settings.Rate);_=new MasterClock(mode,result.Settings.Freewheel,result.Settings.Resync);
   if(!VideoRenderer.Displays().Any(d=>d.Name==result.Display.Name&&d.Width==result.Display.Width&&d.Height==result.Display.Height))throw new InvalidDataException("指定した出力画面が接続されていません。");
   var old=settings;var oldDisplay=selectedDisplay;var oldName=selectedDisplayName;
@@ -133,9 +134,9 @@ public partial class MainWindow
   string final="出力を停止しました。";
   try {
    using var log=new SyncRunLog();log.Write(new{kind="configuration",settings,display,hostSeconds=MasterClock.Timestamp()});
-   await Task.Run(()=>new ProgramPlayback(new UiDispatcher()).RunAsync(cues,display,clock,settings.Offset/Editor.Rate.Fps,t=>{observation=t;log.Write(new{kind="programObservation",t});},token,false,target,
+   await Task.Run(()=>new ProgramPlayback(new UiDispatcher()).RunAsync(cues,display,clock,settings.Offset/Editor.Rate.Fps,t=>{observation=t;log.Write(new{kind="programObservation",t});},token,false,Program.Arguments.Contains("--diagnostic-no-monitor")?0:target,
     ()=>Dispatcher.UIThread.Post(()=>_ = Safe(async()=>{await RequestStopAsync(false);})),
-    error=>Dispatcher.UIThread.Post(()=>{Control<TextBlock>("PreviewInfo").Text="出力モニターのエラー: "+error;})));
+    error=>Dispatcher.UIThread.Post(()=>{Control<TextBlock>("PreviewInfo").Text="出力モニターのエラー: "+error;}),settings.OutputMode));
   }catch(OperationCanceledException){}catch(Exception e){final="出力エラー: "+e.Message;}
   finally{await FinishProductionAsync();StatusMessage(final);}
  }

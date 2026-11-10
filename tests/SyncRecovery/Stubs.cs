@@ -22,7 +22,8 @@ namespace LtcPlayer.App {
  public record OutputDisplay(int Width=4,int Height=4);
  public record ProgramMonitorStatus(int Error=0);
  public sealed class VideoRenderer : IDisposable {
-  public VideoRenderer(OutputDisplay d){}
+  public OutputPresentationMode OutputMode{get;}
+  public VideoRenderer(OutputDisplay d,OutputPresentationMode mode=OutputPresentationMode.Standard){OutputMode=mode;}
   public void EnableStopConfirmation(){} public void AttachMonitor(nint p){}
   public bool PollStopRequest()=>false; public void UpdateMonitor(){}
   public ProgramMonitorStatus MonitorStatus()=>new();

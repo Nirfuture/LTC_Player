@@ -68,6 +68,7 @@
     <StackPanel Margin="0,0,0,10" Spacing="4">
      <TextBlock x:Name="ModeLabel" Text="プレビュー" FontSize="17" FontWeight="SemiBold"/>
      <TextBlock x:Name="OutputGeometry" Foreground="#8DCBFF"/>
+     <TextBlock x:Name="OutputModeLabel" Foreground="#C8D4E0"/>
      <TextBlock x:Name="VideoGeometry" Foreground="#C8D4E0"/>
     </StackPanel>
     <Grid x:Name="PreviewViewport" Grid.Row="1" MinHeight="160" Background="#252E39" ClipToBounds="True">

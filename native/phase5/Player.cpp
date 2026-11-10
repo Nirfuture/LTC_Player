@@ -48,7 +48,7 @@ static LRESULT CALLBACK OutputProc(HWND window,UINT message,WPARAM w,LPARAM l) {
     if(message==WM_CLOSE || (message==WM_KEYDOWN && w==VK_ESCAPE)) {auto o=(Output*)GetWindowLongPtrW(window,GWLP_USERDATA);if(o&&o->confirmClose)o->stopRequested=true;else DestroyWindow(window); return 0; }
     return DefWindowProcW(window,message,w,l);
 }
-static int CreateOutput(const Display* selected,void** result,bool probe) {
+static int CreateOutput(const Display* selected,void** result,bool probe,bool composited=false) {
     if(!selected || !result) return E_INVALIDARG; *result=nullptr;
     try {
         bool found=false; for(auto& d:Displays()) if(!wcscmp(d.name,selected->name) && d.x==selected->x && d.y==selected->y && d.width==selected->width && d.height==selected->height) found=true;
@@ -64,7 +64,7 @@ static int CreateOutput(const Display* selected,void** result,bool probe) {
         DXGI_SWAP_CHAIN_DESC sd={}; sd.BufferDesc.Width=o->width; sd.BufferDesc.Height=o->height;
         sd.BufferDesc.Format=DXGI_FORMAT_B8G8R8A8_UNORM; sd.SampleDesc.Count=1;
         sd.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT; sd.BufferCount=2; sd.OutputWindow=o->window;
-        sd.Windowed=TRUE; sd.SwapEffect=DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        sd.Windowed=TRUE; sd.SwapEffect=composited?DXGI_SWAP_EFFECT_DISCARD:DXGI_SWAP_EFFECT_FLIP_DISCARD;
         Check(D3D11CreateDeviceAndSwapChain(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,
             nullptr,0,D3D11_SDK_VERSION,&sd,&o->swap,&o->device,nullptr,&o->context));
         ComPtr<IDXGIFactory> factory; Check(o->swap->GetParent(IID_PPV_ARGS(&factory)));
@@ -78,6 +78,12 @@ static int CreateOutput(const Display* selected,void** result,bool probe) {
     } catch(HRESULT hr){return hr;} catch(...){return E_OUTOFMEMORY;}
 }
 extern "C" __declspec(dllexport) int __cdecl output_create(const Display* selected,void** result){return CreateOutput(selected,result,false);}
+// Compatibility path selected explicitly in application settings.
+extern "C" __declspec(dllexport) int __cdecl output_create_composited(const Display* selected,void** result,int probe){return CreateOutput(selected,result,probe!=0,true);}
+extern "C" __declspec(dllexport) int __cdecl output_presentation_mode(void* handle){
+ auto o=(Output*)handle;if(!o||!o->swap)return E_INVALIDARG;DXGI_SWAP_CHAIN_DESC sd={};HRESULT hr=o->swap->GetDesc(&sd);if(FAILED(hr))return hr;
+ return sd.SwapEffect==DXGI_SWAP_EFFECT_DISCARD?1:sd.SwapEffect==DXGI_SWAP_EFFECT_FLIP_DISCARD?0:E_FAIL;
+}
 // Verification-only geometry: preserve full-resolution rendering without covering a live output.
 extern "C" __declspec(dllexport) int __cdecl output_create_probe(const Display* selected,void** result){return CreateOutput(selected,result,true);}
 extern "C" __declspec(dllexport) int __cdecl output_frame(void* handle,const unsigned char* pixels,int length) {
