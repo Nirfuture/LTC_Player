@@ -6,7 +6,7 @@
 
 LTCとディスプレイをPCに接続し、アプリの「設定」を開きます。
 
-![メイン画面。右上に「配信」と「設定」があります](images/main-window.jpg)
+![右上の「設定」を開きます](images/main-window-guide.png)
 
 ## 2. 入出力を選ぶ
 
@@ -16,7 +16,7 @@ LTCとディスプレイをPCに接続し、アプリの「設定」を開きま
 
 「適用」を押します。ほかの項目は、まず初期値のまま使用してください。
 
-<img src="images/settings.jpg" alt="LTC入力・入力チャンネル・LTC形式・映像出力を選ぶ設定画面" width="480">
+<img src="images/settings-guide.png" alt="入力機器にオーディオインターフェース、映像出力に外部ディスプレイを選びます" width="480">
 
 ## 3. 「配信」を押す
 
