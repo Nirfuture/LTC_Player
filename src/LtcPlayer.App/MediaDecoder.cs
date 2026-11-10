@@ -13,8 +13,11 @@ public record VideoFrame(byte[] Pixels, double Seconds,int TextureFormat=0,int W
 public record MediaInfo(int Width, int Height, string Codec, double Duration=0, double FrameRate=0,double StartTime=0);
 public sealed class MediaDecoder
 {
-    // Preview owns one decoder. Keep only its current file's analysis, never a global cache.
+    // Each decoder keeps one file version. Production retains at most two cached files per session.
     readonly bool reuseAnalysis;
+    readonly SemaphoreSlim analysisGate=new(1);
+    internal int AnalysisRuns{get;private set;}
+    internal int HapIndexBuilds{get;private set;}
     (string Path,long Length,DateTime Modified)? cachedFile;
     MediaInfo? cachedInfo;
     HapMediaDecoder.Packet[]? cachedPackets;
@@ -42,6 +45,7 @@ public sealed class MediaDecoder
         var ext=Path.GetExtension(path).ToLowerInvariant();if(ext is not (".mp4" or ".mov"))throw new InvalidDataException("MP4/H.264またはMOV/HAP・HAP Qを指定してください。");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        AnalysisRuns++;
         using var p = Start("ffprobe", new[] { "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,codec_tag_string,width,height,duration,avg_frame_rate,start_time,sample_aspect_ratio:format=duration", "-of", "json", path });
         using var registration = timeout.Token.Register(() => Kill(p));
         var output = p.StandardOutput.ReadToEndAsync(); var error = p.StandardError.ReadToEndAsync();
@@ -74,11 +78,16 @@ public sealed class MediaDecoder
         if(!double.IsFinite(seekSeconds)||seekSeconds<0)throw new ArgumentOutOfRangeException(nameof(seekSeconds));
         if(Path.GetExtension(path).Equals(".mov",StringComparison.OrdinalIgnoreCase))
         {
-            var info=await InspectAsync(path,cancellation);
-            var version=reuseAnalysis?FileVersion(path):default;
-            var packets=reuseAnalysis && cachedFile==version?cachedPackets:null;
-            packets??=await HapMediaDecoder.IndexAsync(path,info,cancellation);
-            if(reuseAnalysis && cachedFile==version && FileVersion(path)==version)cachedPackets=packets;
+            MediaInfo info;HapMediaDecoder.Packet[] packets;
+            await analysisGate.WaitAsync(cancellation);
+            try {
+                info=await InspectAsync(path,cancellation);
+                var version=reuseAnalysis?FileVersion(path):default;
+                var existing=reuseAnalysis&&cachedFile==version?cachedPackets:null;
+                if(existing==null){HapIndexBuilds++;existing=await HapMediaDecoder.IndexAsync(path,info,cancellation);}
+                packets=existing;
+                if(reuseAnalysis&&cachedFile==version&&FileVersion(path)==version)cachedPackets=packets;
+            }finally{analysisGate.Release();}
             await foreach(var frame in HapMediaDecoder.DecodeAsync(path,info,seekSeconds,cancellation,packets))yield return frame;
             yield break;
         }

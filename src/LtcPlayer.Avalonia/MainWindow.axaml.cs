@@ -74,6 +74,7 @@ public partial class MainWindow : Window
    else if(loadDefault)await Edit(()=>DefaultTestShow.LoadAsync(Editor));
 
 #if VERIFICATION
+   if(Program.Option("--verify-resume-latency") is {} latencyFolder)await ResumeLatencyVerification.RunAsync(this,latencyFolder);
    if(Program.Option("--verify-portrait-monitor") is {} portraitFolder)await PortraitMonitorVerification.RunAsync(this,portraitFolder);
    if(Program.Option("--verify-release-features") is {} featureFolder)await ReleaseFeaturesVerification.RunAsync(this,featureFolder);
    if(Program.Option("--verify-sync-recovery-output") is {} syncFolder)await SyncRecoveryVerification.RunAsync(this,syncFolder);

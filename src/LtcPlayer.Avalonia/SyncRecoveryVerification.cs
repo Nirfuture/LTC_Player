@@ -26,10 +26,17 @@ public static class SyncRecoveryVerification
    var display=VideoRenderer.Displays().First(d=>d.Primary!=0);
    playback=new ProgramPlayback(new UiDispatcher()).RunAsync([new(Guid.NewGuid(),media,0,info.Duration,info.FrameRate,info.Codec)],display,clock,0,o=>Volatile.Write(ref latest,o),stop.Token,false,target);
    await Stable("continuous input / actual HAP GPU output");
+   for(int resumeCycle=0;resumeCycle<3;resumeCycle++){
    Volatile.Write(ref enabled,0);await Until(()=>latest?.State==SyncState.LOST);var held=latest!;
    await Task.Delay(200);Check(latest!.FramePts==held.FramePts&&latest.Presented==held.Presented,"Input loss changed held output");
    stages.Add(new{Stage="input loss holds output",Observation=latest});
-   Volatile.Write(ref enabled,1);await Until(()=>clock.Read().Generation>0);await Stable("input resumed");
+   double resumedAt=MasterClock.Timestamp();int beforeResume=latest!.Presented;int beforeGeneration=clock.Read().Generation;
+   Volatile.Write(ref enabled,1);await Until(()=>clock.Read().Generation>beforeGeneration);
+   await Until(()=>latest!.Presented>beforeResume&&latest.InputGeneration>beforeGeneration);
+   double resumeMilliseconds=(MasterClock.Timestamp()-resumedAt)*1000;
+   stages.Add(new{Stage="resume to first new video frame",Milliseconds=resumeMilliseconds,Observation=latest});
+   await Stable("input resumed");
+   }
    int generation=clock.Read().Generation;Volatile.Write(ref offsetFrames,30);await Until(()=>clock.Read().Generation>generation);await Stable("forward jump");
    generation=clock.Read().Generation;Volatile.Write(ref offsetFrames,0);await Until(()=>clock.Read().Generation>generation);await Stable("backward jump");
   }catch(Exception e){failure=e;}

@@ -22,7 +22,7 @@ public sealed class ProgramPlayback
         private VideoFrame? current,next;
         private readonly double created=MasterClock.Timestamp();
         public double? ReadyAfter{get;private set;}
-        public CueFrames(ScheduledCue cue,OutputDisplay display,double seek,CancellationToken token){Cue=cue;buffer=new(cue.FilePath,display.Width,display.Height,seek,token);}
+        public CueFrames(ScheduledCue cue,OutputDisplay display,double seek,CancellationToken token,MediaDecoder decoder){Cue=cue;buffer=new(cue.FilePath,display.Width,display.Height,seek,token,decoder);}
         public void Prime(){if(next==null)buffer.TryRead(out next);if(next!=null)ReadyAfter??=MasterClock.Timestamp()-created;}
         public VideoFrame? Select(double seconds,out int skipped)
         {
@@ -39,6 +39,19 @@ public sealed class ProgramPlayback
         double? lastPts=null;Guid? lastId=null,displayedId=null;double? displayedPts=null;uint verificationPixel=0;
         ProgramMonitorStatus? monitorStatus=null;double nextMonitorSample=0;
         double nextRecovery=0;int recoveryAttempts=0;double? lag=null;
+        var analyses=new Dictionary<string,MediaDecoder>(StringComparer.OrdinalIgnoreCase);
+        MediaDecoder DecoderFor(ScheduledCue cue){
+            string key=Path.GetFullPath(cue.FilePath);
+            if(analyses.TryGetValue(key,out var decoder))return decoder;
+            // Two decoded streams at most; retain only their recent file analyses.
+            if(analyses.Count>=2){
+                var pinned=new[]{active?.Cue.FilePath,preload?.Cue.FilePath,recovery?.Cue.FilePath}.Where(p=>p!=null).Select(p=>Path.GetFullPath(p!)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var unused=analyses.Keys.FirstOrDefault(p=>!pinned.Contains(p));
+                if(unused!=null)analyses.Remove(unused);
+                else return new MediaDecoder(reuseAnalysis:true);
+            }
+            decoder=new MediaDecoder(reuseAnalysis:true);analyses.Add(key,decoder);return decoder;
+        }
         try
         {
             await dispatcher.InvokeAsync(()=>{renderer=new VideoRenderer(display);if(monitorWindow!=0){renderer.EnableStopConfirmation();renderer.AttachMonitor(monitorWindow);}});
@@ -69,13 +82,13 @@ public sealed class ProgramPlayback
                         {
                             double relative=now-selected.Start;
                             if(preload?.Cue.CueId==selected.CueId && relative<0.5){active=preload;preload=null;}
-                            else {active=new(selected,display,Math.Max(0,relative-0.2),token);++seeks;}
+                            else {active=new(selected,display,Math.Max(0,relative-0.2),token,DecoderFor(selected));++seeks;}
                         }
                     }
                     if(upcoming?.CueId!=preload?.Cue.CueId)
                     {
                         if(preload!=null){await preload.DisposeAsync();preload=null;}
-                        if(upcoming!=null&&recovery==null)preload=new(upcoming,display,0,token);
+                        if(upcoming!=null&&recovery==null)preload=new(upcoming,display,0,token,DecoderFor(upcoming));
                     }
                     preload?.Prime();
                     if(selected==null)pixels=black;
@@ -102,7 +115,7 @@ public sealed class ProgramPlayback
                                     if(relative+lead<selected.Duration){
                                         // Reuse the next-cue decoder's resource budget.
                                         if(preload!=null){await preload.DisposeAsync();preload=null;}
-                                        recovery=new(selected,display,relative+lead,token);nextRecovery=stamp+1;recoveryAttempts++;seeks++;
+                                        recovery=new(selected,display,relative+lead,token,DecoderFor(selected));nextRecovery=stamp+1;recoveryAttempts++;seeks++;
                                     }
                                 }
                             }

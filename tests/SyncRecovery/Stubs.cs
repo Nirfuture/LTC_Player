@@ -2,8 +2,9 @@ using System.Runtime.CompilerServices;
 namespace LtcPlayer.App {
  public struct TcFrame {public int Hours,Minutes,Seconds,Frame,Drop,Reverse;}
  public record VideoFrame(byte[] Pixels,double Seconds,int TextureFormat=0,int Width=0,int Height=0);
- public record MediaInfo(double Duration=10,double FrameRate=25,string Codec="h264");
+ public record MediaInfo(double Duration=10,double FrameRate=25,string Codec="h264"){public int Width=>1920;public int Height=>1080;}
  public sealed class MediaDecoder {
+  public MediaDecoder(bool reuseAnalysis=false){}
   public static int DelayMs=80;
   public static int PreparationMs;
   public static int Active,Peak;
