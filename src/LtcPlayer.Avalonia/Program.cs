@@ -17,7 +17,11 @@ internal static class Program
  public static string? Option(string name){int i=Array.IndexOf(Arguments,name);return i>=0&&i+1<Arguments.Length?Arguments[i+1]:null;}
  [STAThread] public static int Main(string[] args)
  {
+  #if VERIFICATION
+  using var instance = new SingleInstance(args.Any(a=>a.StartsWith("--verify-",StringComparison.Ordinal))?".Verification":"");
+#else
   using var instance = new SingleInstance();
+#endif
   if (!instance.IsFirst) { instance.ActivateExisting(); return 0; }
   Arguments=args;
   try{return AppBuilder.Configure<PlayerApp>().UsePlatformDetect().LogToTrace().StartWithClassicDesktopLifetime(args);}

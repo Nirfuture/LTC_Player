@@ -12,11 +12,11 @@ internal sealed class SingleInstance : IDisposable
  readonly CancellationTokenSource stop = new();
  readonly string pipeName;
  public bool IsFirst { get; }
- public SingleInstance()
+ public SingleInstance(string scope="")
  {
   if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Windows is required.");
   using var identity = WindowsIdentity.GetCurrent();
-  string user = identity.User!.Value + "." + Process.GetCurrentProcess().SessionId;
+  string user = identity.User!.Value + "." + Process.GetCurrentProcess().SessionId + scope;
   pipeName = "LtcPlayer.Activate." + user;
   gate = new Mutex(false, @"Local\LtcPlayer.Instance." + user, out bool created);
   IsFirst = created;

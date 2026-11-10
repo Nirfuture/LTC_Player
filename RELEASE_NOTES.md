@@ -1,10 +1,10 @@
-# LTC Player 0.1.0-preview.6
+# LTC Player 0.1.0-preview.7
 
 Windows 11 x64向けのプレビュー版です。
 
 ## ダウンロード
 
-[Windows用アプリをダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.6/LtcPlayer-0.1.0-preview.6-win-x64.zip)
+[Windows用アプリをダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.7/LtcPlayer-0.1.0-preview.7-win-x64.zip)
 
 必要なのは、このZIPだけです。
 
@@ -14,12 +14,11 @@ Windows 11 x64向けのプレビュー版です。
 
 ## 変更点
 
-- 縦長・狭い画面では動画一覧とプレビューを縦に並べ、小さい画面でもスクロールして操作できるようにしました。
-- 画面間の移動時に、移動先の作業領域と拡大率に合わせてウィンドウを収めます。
-- 設定画面を可変サイズにし、項目はスクロール、「適用」「キャンセル」は画面内に表示します。
-- LTC入力喪失時の補間時間の初期値を0.5秒から0.1秒に変更しました。保存済みの設定値は保持します。
+- 出力中のキューを緑色で表示します。
+- 出力モニターの15fps制限を解除しました。
+- LTC停止中は「確認」▶で任意の有効なキューを先頭から出力できます。■または動画終端で映像を保持し、LTC受信再開で自動的に同期出力へ戻ります。
 
-表示方式の切り替え、HAP解析再利用、テスト用LTC音声、アイコン、二重起動防止も含みます。
+縦長画面への対応、表示方式の切り替え、HAP解析再利用、テスト用LTC音声、二重起動防止も含みます。
 
 ## 確認が必要な点
 
@@ -27,7 +26,7 @@ Windows 11 x64向けのプレビュー版です。
 
 このプレビュー版は未署名です。Smart App Controlが有効な環境では、起動をブロックされる場合があります。
 
-検証状況と未解決項目は[配布前の確認記録](https://github.com/Nirfuture/LTC_Player/blob/main/docs/releases/0.1.0-preview.6.md)を参照してください。
+検証状況と未解決項目は[配布前の確認記録](https://github.com/Nirfuture/LTC_Player/blob/main/docs/releases/0.1.0-preview.7.md)を参照してください。
 
 [対応環境・ファイル形式](https://github.com/Nirfuture/LTC_Player/blob/main/docs/COMPATIBILITY.md) · [困ったとき](https://github.com/Nirfuture/LTC_Player/blob/main/docs/TROUBLESHOOTING.md)
 

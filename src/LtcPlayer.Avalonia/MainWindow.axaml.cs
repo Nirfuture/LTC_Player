@@ -74,6 +74,7 @@ public partial class MainWindow : Window
    else if(loadDefault)await Edit(()=>DefaultTestShow.LoadAsync(Editor));
 
 #if VERIFICATION
+   if(Program.Option("--verify-manual-output") is {} manualFolder)await ManualOutputVerification.RunAsync(this,manualFolder);
    if(Program.Option("--verify-responsive") is {} responsiveFolder)await ResponsiveVerification.RunAsync(this,responsiveFolder);
    if(Program.Option("--verify-output-mode") is {} modeFolder)await OutputModeVerification.RunAsync(this,modeFolder);
    if(Program.Option("--verify-live-startup") is {} liveFolder)await LiveStartupVerification.RunAsync(this,liveFolder);
@@ -129,7 +130,7 @@ public partial class MainWindow : Window
  void UpdateEnabled()
  {
   bool edit=!armed&&!busy&&!closing;
-  Control<StackPanel>("EditorTools").IsEnabled=edit;Grid.IsEnabled=edit;
+  Control<StackPanel>("EditorTools").IsEnabled=edit;Grid.IsEnabled=!busy&&!closing;Grid.IsReadOnly=armed;
 
   UpdateDeliveryButton();
   Control<StackPanel>("PreviewControls").IsVisible=!armed;UpdateRowControls();

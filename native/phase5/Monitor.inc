@@ -26,7 +26,7 @@ float4 PS(V v):SV_TARGET{return float4(image.Sample(smp,v.uv).rgb,1);})";
 extern "C" __declspec(dllexport) int __cdecl monitor_update(void* handle,int force) {
  auto o=(Output*)handle;if(!o||!o->monitor||!o->last||o->monitorError)return S_FALSE;
  LARGE_INTEGER stamp,freq;QueryPerformanceCounter(&stamp);QueryPerformanceFrequency(&freq);
- if(!force&&stamp.QuadPart-o->monitorStamp<freq.QuadPart/15)return S_FALSE;
+
  if(o->monitorBusy){BOOL done=FALSE;auto hr=o->context->GetData(o->monitorPending.Get(),&done,sizeof(done),D3D11_ASYNC_GETDATA_DONOTFLUSH);if(FAILED(hr)){o->monitorError=hr;return hr;}if(hr!=S_OK||!done){++o->monitorGpuBusy;return S_FALSE;}o->monitorBusy=false;}
  try {
   // Keep at most one pending back buffer. Retry its presentation before writing
@@ -38,6 +38,7 @@ extern "C" __declspec(dllexport) int __cdecl monitor_update(void* handle,int for
    Check(hr);if(hr!=S_OK)return S_FALSE;
    o->monitorPresentPending=false;++o->monitorFrames;return S_OK;
   }
+  if(!force&&stamp.QuadPart-o->monitorStamp<freq.QuadPart/120)return S_FALSE;
   RECT rect={};if(!GetClientRect(o->monitorWindow,&rect))return S_FALSE;
   int width=std::max((int)rect.right,1),height=std::max((int)rect.bottom,1);
   if(width!=o->monitorWidth||height!=o->monitorHeight){
