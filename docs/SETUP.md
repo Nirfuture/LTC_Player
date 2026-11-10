@@ -29,7 +29,7 @@ ffprobe -version
 ## ダウンロード・起動
 
 1. [ダウンロードページ](https://github.com/Nirfuture/LTC_Player/releases)を開きます。
-2. 「Assets」から`LtcPlayer-0.1.0-preview.1-win-x64.zip`をダウンロードします。
+2. 「Assets」から`LtcPlayer-…-win-x64.zip`をダウンロードします。
 3. ZIPを展開します。
 4. 展開したフォルダー内の`LtcPlayer.Avalonia.exe`を起動します。
 

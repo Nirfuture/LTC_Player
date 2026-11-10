@@ -21,6 +21,7 @@ Windows 11 x64対応。現在はプレビュー版です。使用する環境で
 ## 開発・仕様
 
 - [ビルド手順](docs/BUILD.md)
+- [リリース作成](docs/RELEASING.md)
 - [詳細仕様](docs/FINAL_SPEC.md)
 
 ## ライセンス
