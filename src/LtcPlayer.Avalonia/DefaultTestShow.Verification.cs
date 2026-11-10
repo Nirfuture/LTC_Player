@@ -22,7 +22,10 @@ public static partial class DefaultTestShow
    });
    await Test("delivery button starts / four synthetic LTC positions / cancel stop / stop and restart",async()=>{
     var display=VideoRenderer.Displays().First(d=>d.Primary!=0);await w.ApplySettingsAsync(new(new(Rate:"29.97 DF"),display));int position=5;
-    await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF"),async(clock,token)=>{int index=0;while(!token.IsCancellationRequested){clock.Accept(new TcFrame{Seconds=Volatile.Read(ref position),Frame=index++%15,Drop=1},MasterClock.Timestamp());await Task.Delay(33,token);}});
+    // Advance continuously within each clip. The previous %15 source jumped
+    // backward every half second, repeatedly canceling cold decoder startup.
+    // Intentional discontinuities are exercised by SyncRecoveryVerification.
+    await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF"),async(clock,token)=>{int index=0,last=-1;while(!token.IsCancellationRequested){int start=Volatile.Read(ref position);if(start!=last){index=0;last=start;}int frame=start*30+index++;clock.Accept(new TcFrame{Minutes=frame/1800,Seconds=frame/30%60,Frame=frame%30,Drop=1},MasterClock.Timestamp());await Task.Delay(33,token);}});
     button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>w.IsArmed&&w.LatestObservation?.FramePts>0);
     var observed=new List<ProgramObservation>();for(int i=0;i<4;i++){Volatile.Write(ref position,Starts[i]);Guid id=w.Editor.Rows[i].CueId;await Until(()=>w.LatestObservation?.CueId==id&&w.LatestObservation?.Monitor is{Presented:>2,Error:0});observed.Add(w.LatestObservation!);}
     w.ConfirmStopForTest=_=>Task.FromResult(false);button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>w.Delivery==DeliveryState.Streaming&&button.IsEnabled);Check(w.IsArmed,"cancel stopped");

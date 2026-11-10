@@ -73,6 +73,7 @@ public partial class MainWindow : Window
    else if(loadDefault)await Edit(()=>DefaultTestShow.LoadAsync(Editor));
 
 #if VERIFICATION
+   if(Program.Option("--verify-sync-recovery-output") is {} syncFolder)await SyncRecoveryVerification.RunAsync(this,syncFolder);
    if(Program.Option("--verify-preview-performance") is {} performanceFolder)await PreviewPerformanceVerification.RunAsync(this,performanceFolder);
    if(Program.Option("--verify-phase2-adapter") is {} phase2Folder){await Phase2Verification.RunAsync(new RegressionWindow(),phase2Folder);Shutdown(RegressionApplication.Current.ExitCode);return;}
    if(Program.Option("--verify-phase5") is {} folder)await Phase5Verification.RunAsync(this,folder);
