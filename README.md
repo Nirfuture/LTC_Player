@@ -1,20 +1,28 @@
-# LTC Player 0.1.0-preview.1
+# LTC Player
 
-Windows 11 x64向けのLTC同期映像プレイヤー。身内向け検証版。
+外部から受信したLTCに合わせて動画を再生し、指定したディスプレイへ出力するWindows用プレイヤーです。
 
-- 利用者: GitHub Releases用のwin-x64 ZIPを展開し、[簡単な使い方](docs/QUICKSTART.md)を参照。
-- 仕様: [最終仕様](docs/FINAL_SPEC.md)、[互換性](docs/COMPATIBILITY.md)。
-- 開発者: [ビルド手順](docs/BUILD.md)。ソリューションはLtcPlayer.sln。
-- 自作アプリ/描画はMIT、libltc音声DLLはLGPL。LICENSE、NOTICE.md、LICENSESを参照。
+MP4/H.264、MOV/HAP・HAP Qに対応しています。動画ごとに開始タイムコードを設定し、受信したLTCに応じて映像を切り替えます。
 
-FFmpeg/ffprobeとVC++ x64ランタイムは別途必要。.NET 10ランタイムは配布ZIPへ同梱。ネットワーク配信機能ではなく、指定ディスプレイへの映像送出を行う。
+## ダウンロード
 
-物理的同期精度、長時間稼働、他PCでの動作は未保証。公開前の残課題はPRE_RELEASE_REVIEW.mdを参照。
+[ダウンロードページ](https://github.com/Nirfuture/LTC_Player/releases)
 
-## 配布ファイル
-- [Windows x64実行用ZIP](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.1/LtcPlayer-0.1.0-preview.1-win-x64.zip)
-- [対応ソースZIP](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.1/LtcPlayer-0.1.0-preview.1-source.zip)
-- [Releaseとハッシュ](https://github.com/Nirfuture/LTC_Player/releases/tag/v0.1.0-preview.1)
+Windows 11 x64対応。現在はプレビュー版です。使用する環境で事前に動作を確認してください。
 
-非公開リポジトリのため、リンクを開くには招待されたGitHubアカウントでのログインが必要です。
+## 使い方
 
+- [セットアップと基本操作](docs/QUICKSTART.md)
+- [対応環境・ファイル形式](docs/COMPATIBILITY.md)
+- [困ったとき](docs/TROUBLESHOOTING.md)
+
+## 開発・仕様
+
+- [ビルド手順](docs/BUILD.md)
+- [詳細仕様](docs/FINAL_SPEC.md)
+
+## ライセンス
+
+アプリ本体はMITライセンス、libltcを使用する音声DLLはLGPLです。
+
+詳細は[LICENSE](LICENSE)、[NOTICE.md](NOTICE.md)、[LICENSES](LICENSES)を参照してください。
