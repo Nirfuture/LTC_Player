@@ -25,9 +25,9 @@ public static class HapMediaDecoder
         }
         if(packets.Count==0)throw new InvalidDataException("HAPフレームがありません。");return packets.ToArray();
     }
-    public static async IAsyncEnumerable<VideoFrame> DecodeAsync(string path,MediaInfo info,double seek,[EnumeratorCancellation]CancellationToken token)
+    public static async IAsyncEnumerable<VideoFrame> DecodeAsync(string path,MediaInfo info,double seek,[EnumeratorCancellation]CancellationToken token,Packet[]? preparedPackets=null)
     {
-        var packets=await IndexAsync(path,info,token);int kind=info.Codec=="hap"?1:2;
+        var packets=preparedPackets??await IndexAsync(path,info,token);int kind=info.Codec=="hap"?1:2;
         await using var file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read,65536,true);
         foreach(var packet in packets)
         {

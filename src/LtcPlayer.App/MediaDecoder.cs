@@ -13,6 +13,17 @@ public record VideoFrame(byte[] Pixels, double Seconds,int TextureFormat=0,int W
 public record MediaInfo(int Width, int Height, string Codec, double Duration=0, double FrameRate=0,double StartTime=0);
 public sealed class MediaDecoder
 {
+    // Preview owns one decoder. Keep only its current file's analysis, never a global cache.
+    readonly bool reuseAnalysis;
+    (string Path,long Length,DateTime Modified)? cachedFile;
+    MediaInfo? cachedInfo;
+    HapMediaDecoder.Packet[]? cachedPackets;
+    public MediaDecoder(bool reuseAnalysis=false)=>this.reuseAnalysis=reuseAnalysis;
+    static (string Path,long Length,DateTime Modified) FileVersion(string path)
+    {
+        var file=new FileInfo(path);
+        return (file.FullName,file.Length,file.LastWriteTimeUtc);
+    }
     internal static Process Start(string executable, IEnumerable<string> args)
     {
         var si = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
@@ -24,6 +35,10 @@ public sealed class MediaDecoder
     public async Task<MediaInfo> InspectAsync(string path, CancellationToken cancellation)
     {
         if (!File.Exists(path)) throw new FileNotFoundException("動画ファイルが見つかりません。", path);
+        cancellation.ThrowIfCancellationRequested();
+        var version=reuseAnalysis?FileVersion(path):default;
+        if(reuseAnalysis && cachedFile==version && cachedInfo!=null)return cachedInfo;
+        if(reuseAnalysis){cachedFile=null;cachedInfo=null;cachedPackets=null;}
         var ext=Path.GetExtension(path).ToLowerInvariant();if(ext is not (".mp4" or ".mov"))throw new InvalidDataException("MP4/H.264またはMOV/HAP・HAP Qを指定してください。");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(TimeSpan.FromSeconds(15));
@@ -50,7 +65,9 @@ public sealed class MediaDecoder
         if(s.TryGetProperty("avg_frame_rate",out var rate)) {var parts=rate.GetString()!.Split('/');if(parts.Length==2 && double.TryParse(parts[0],NumberStyles.Float,CultureInfo.InvariantCulture,out var n) && double.TryParse(parts[1],NumberStyles.Float,CultureInfo.InvariantCulture,out var d) && d>0)fps=n/d;}
         if(!double.IsFinite(duration)||duration<=0||!double.IsFinite(fps)||fps<=0)throw new InvalidDataException("映像の長さ・フレームレートを取得できません。");
         double startTime=0;if(s.TryGetProperty("start_time",out var st))double.TryParse(st.GetString(),NumberStyles.Float,CultureInfo.InvariantCulture,out startTime);
-        return info with {Duration=duration,FrameRate=fps,StartTime=startTime};
+        info=info with {Duration=duration,FrameRate=fps,StartTime=startTime};
+        if(reuseAnalysis && FileVersion(path)==version){cachedFile=version;cachedInfo=info;}
+        return info;
     }
     public async IAsyncEnumerable<VideoFrame> DecodeAsync(string path, int width, int height, [EnumeratorCancellation] CancellationToken cancellation, double seekSeconds = 0)
     {
@@ -58,7 +75,11 @@ public sealed class MediaDecoder
         if(Path.GetExtension(path).Equals(".mov",StringComparison.OrdinalIgnoreCase))
         {
             var info=await InspectAsync(path,cancellation);
-            await foreach(var frame in HapMediaDecoder.DecodeAsync(path,info,seekSeconds,cancellation))yield return frame;
+            var version=reuseAnalysis?FileVersion(path):default;
+            var packets=reuseAnalysis && cachedFile==version?cachedPackets:null;
+            packets??=await HapMediaDecoder.IndexAsync(path,info,cancellation);
+            if(reuseAnalysis && cachedFile==version && FileVersion(path)==version)cachedPackets=packets;
+            await foreach(var frame in HapMediaDecoder.DecodeAsync(path,info,seekSeconds,cancellation,packets))yield return frame;
             yield break;
         }
         var times = Channel.CreateUnbounded<double>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });

@@ -7,6 +7,8 @@ public sealed class PreviewPlayer : IAsyncDisposable
 {
  readonly PreviewHost host;readonly SemaphoreSlim commands=new(1);
  readonly Stopwatch clock=new();
+ readonly MediaDecoder decoder=new(reuseAnalysis:true);
+ double? stillPosition;
  MediaInfo? media;PreviewAudioInfo? audioInfo;string path="",errorNotice="";double origin,position;int presented;
  CancellationTokenSource? cancel;Task? loop;PreviewAudio? audio;
  PreviewState state;bool armed;float volume=.5f;bool muted;
@@ -22,8 +24,11 @@ public sealed class PreviewPlayer : IAsyncDisposable
  {
   await commands.WaitAsync();try{
    RejectArmed();await HaltAsync();media=null;audioInfo=null;path="";errorNotice="";state=PreviewState.Empty;last=null;host.Black();Notify();
-   var info=await Task.Run(()=>new MediaDecoder().InspectAsync(file,CancellationToken.None));
-   var sound=await Task.Run(()=>PreviewAudio.InspectAsync(file,CancellationToken.None));
+   stillPosition=null;
+   var videoTask=Task.Run(()=>decoder.InspectAsync(file,CancellationToken.None));
+   var audioTask=Task.Run(()=>PreviewAudio.InspectAsync(file,CancellationToken.None));
+   await Task.WhenAll(videoTask,audioTask);
+   var info=await videoTask;var sound=await audioTask;
    media=info;audioInfo=sound;path=file;position=0;state=PreviewState.Ready;
    await StillAsync(0);Notify();
   }finally{commands.Release();}
@@ -38,7 +43,8 @@ public sealed class PreviewPlayer : IAsyncDisposable
    cancel=new();origin=position;clock.Reset();
    if(audioInfo!.Supported){audio=new(path,position,media.Duration,muted?0:volume);try{await audio.ReadyAsync(cancel.Token);}catch{await HaltAsync();throw;}}
    // Decode and show an initial frame before the preview audio clock starts.
-   await StillAsync(position);state=PreviewState.Playing;clock.Start();if(audio!=null)await audio.SetPausedAsync(false,cancel.Token);
+   if(last==null||stillPosition!=position)await StillAsync(position);
+   stillPosition=null;state=PreviewState.Playing;clock.Start();if(audio!=null)await audio.SetPausedAsync(false,cancel.Token);
    loop=RunAsync(cancel.Token);Notify();
   }finally{commands.Release();}
  }
@@ -68,12 +74,13 @@ public sealed class PreviewPlayer : IAsyncDisposable
  double CurrentPosition()=>Math.Min(media!.Duration,origin+(audio?.Progress.Seconds??clock.Elapsed.TotalSeconds));
  async Task StillAsync(double at)
  {
-  var frame=await Task.Run(async()=>{await foreach(var f in new MediaDecoder().DecodeAsync(path,640,360,CancellationToken.None,at))return f;return null;});
+  var frame=await Task.Run(async()=>{await foreach(var f in decoder.DecodeAsync(path,640,360,CancellationToken.None,at))return f;return null;});
+  stillPosition=frame!=null?at:null;
   if(frame!=null){host.Present(frame);last=frame;presented++;}else host.Black();
  }
  async Task RunAsync(CancellationToken token)
  {
-  await using var buffer=new FrameBuffer(path,640,360,origin,token);VideoFrame? next=null,current=last;
+  await using var buffer=new FrameBuffer(path,640,360,origin,token,decoder);VideoFrame? next=null,current=last;
   try {
    while(!token.IsCancellationRequested){
     if(state==PreviewState.Playing){

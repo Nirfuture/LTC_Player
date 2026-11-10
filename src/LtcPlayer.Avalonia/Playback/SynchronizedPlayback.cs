@@ -7,12 +7,12 @@ public sealed class FrameBuffer : IAsyncDisposable
     private readonly Channel<VideoFrame> frames=Channel.CreateBounded<VideoFrame>(8);
     private readonly Task worker;
     public bool Ended=>frames.Reader.Completion.IsCompletedSuccessfully;
-    public FrameBuffer(string path,int width,int height,double seek,CancellationToken token)
+    public FrameBuffer(string path,int width,int height,double seek,CancellationToken token,MediaDecoder? decoder=null)
     {
         cancel=CancellationTokenSource.CreateLinkedTokenSource(token);
         worker=Task.Run(async ()=>
         {
-            try {await foreach(var f in new MediaDecoder().DecodeAsync(path,width,height,cancel.Token,seek)) await frames.Writer.WriteAsync(f,cancel.Token); frames.Writer.TryComplete();}
+            try {await foreach(var f in (decoder??new MediaDecoder()).DecodeAsync(path,width,height,cancel.Token,seek)) await frames.Writer.WriteAsync(f,cancel.Token); frames.Writer.TryComplete();}
             catch(Exception e){frames.Writer.TryComplete(e);}
         });
     }
