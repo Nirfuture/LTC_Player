@@ -1,6 +1,6 @@
 # LTC Player
 
-外部から受信したLTCに合わせて動画を再生し、指定したディスプレイへ出力するWindows用プレイヤーです。
+動画のキュー作成とLTC（音声タイムコード）に同期した再生に対応するWindows用プレイヤーです。指定したディスプレイへ映像を出力できます。
 
 MP4/H.264、MOV/HAP・HAP Qに対応しています。動画ごとに開始タイムコードを設定し、受信したLTCに応じて映像を切り替えます。
 
@@ -13,6 +13,7 @@ Windows 11 x64対応。現在はプレビュー版です。使用する環境で
 ## 使い方
 
 - [クイックスタート](docs/QUICKSTART.md)
+- [操作リファレンス](docs/USER_GUIDE.md)
 - [対応環境・ファイル形式](docs/COMPATIBILITY.md)
 - [困ったとき](docs/TROUBLESHOOTING.md)
 
