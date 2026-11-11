@@ -10,7 +10,7 @@
 
 キューは、動画ファイルと再生開始時刻を組み合わせた登録単位です。
 
-![メイン画面。①キュー追加、②開始TC、③有効、④再生操作、⑤シークバー、⑥音声ON/OFF。](images/quickstart-queue.png)
+<a href="images/quickstart-queue.png"><img src="images/quickstart-queue.png" alt="メイン画面。①キュー追加、②開始TC、③有効、④再生操作、⑤シークバー、⑥音声ON/OFF。" width="680"></a>
 
 ### 登録と編集
 
@@ -92,7 +92,7 @@ LTCの受信が再開すると、現在のタイムコードに同期します�
 
 設定の「LTC入力」で入力機器と形式を選びます。①〜③を設定し、④「適用」を押します。
 
-![LTC入力。①デバイス、②チャンネル、③形式、④適用。機器名は例示。](images/quickstart-input.png)
+<a href="images/quickstart-input.png"><img src="images/quickstart-input.png" alt="LTC入力。①デバイス、②チャンネル、③形式、④適用。機器名は例示。" width="480"></a>
 
 ### 入力設定
 
@@ -135,7 +135,7 @@ LTCの受信が再開すると、現在のタイムコードに同期します�
 
 外部ディスプレイをPCに接続し、設定の「映像出力」を開きます。
 
-![映像出力。①ディスプレイ、②適用。機器名は例示。](images/quickstart-display.png)
+<a href="images/quickstart-display.png"><img src="images/quickstart-display.png" alt="映像出力。①ディスプレイ、②適用。機器名は例示。" width="480"></a>
 
 ① **ディスプレイ**：出力先の画面を選択します。
 
@@ -143,7 +143,7 @@ LTCの受信が再開すると、現在のタイムコードに同期します�
 
 ③ **出力開始**：画面右上のボタンで、外部画面への映像出力を開始します。
 
-![画面右上の③出力開始ボタン。](images/quickstart-output-start.png)
+<a href="images/quickstart-output-start.png"><img src="images/quickstart-output-start.png" alt="画面右上の③出力開始ボタン。" width="400"></a>
 
 ### 停止と取消
 
@@ -197,7 +197,7 @@ LTCの受信が再開すると、現在のタイムコードに同期します�
 
 蓋絵は、動画の代わりに表示する静止画です。異常発生時に手動で映像を隠したり、待機中にイベントロゴを表示したりする際に使用します。
 
-![蓋絵。①画像の登録・変更、②フェード時間、③表示切り替え、④画像の解除。](images/reference-cover.png)
+<a href="images/reference-cover.png"><img src="images/reference-cover.png" alt="蓋絵。①画像の登録・変更、②フェード時間、③表示切り替え、④画像の解除。" width="520"></a>
 
 ① **変更**：外部出力を停止しているとき、「変更」を押すことで、PNG/JPEG画像を登録することができます。
 
