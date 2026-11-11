@@ -34,7 +34,7 @@ float4 PSQ(V v):SV_TARGET {
 extern "C" __declspec(dllexport) int __cdecl output_hap(void* handle,const unsigned char* blocks,int length,int width,int height,int kind) {
     auto o=(Output*)handle;
     if(!o || !blocks || width<=0 || height<=0 || width>8192 || height>8192 || width%4 || height%4 || (kind!=1 && kind!=2 && kind!=3) || length!=(kind==3?width*height*4:(width/4)*(height/4)*(kind==1?8:16)))return E_INVALIDARG;
-    if(!IsWindow(o->window)||(!o->embedded && !o->confirmClose && (GetAsyncKeyState(VK_ESCAPE)&0x8000)))return HRESULT_FROM_WIN32(ERROR_CANCELLED);
+    if(!o->offscreen && (!IsWindow(o->window)||(!o->embedded && !o->confirmClose && (GetAsyncKeyState(VK_ESCAPE)&0x8000))))return HRESULT_FROM_WIN32(ERROR_CANCELLED);
     try {
         PrepareHapPipeline(o);
         if(o->sourceWidth!=width || o->sourceHeight!=height || o->sourceKind!=kind) {
@@ -56,7 +56,6 @@ extern "C" __declspec(dllexport) int __cdecl output_hap(void* handle,const unsig
         ID3D11ShaderResourceView* view=o->compressedView.Get();o->context->PSSetShaderResources(0,1,&view);
         ID3D11SamplerState* sampler=o->sampler.Get();o->context->PSSetSamplers(0,1,&sampler);o->context->Draw(3,0);
         view=nullptr;o->context->PSSetShaderResources(0,1,&view);o->context->OMSetRenderTargets(0,nullptr,nullptr);
-        ComPtr<ID3D11Texture2D> back;Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));
         o->baseImage=o->rendered;return PresentComposite(o);
     } catch(HRESULT hr){return hr;} catch(...){return E_OUTOFMEMORY;}
 }

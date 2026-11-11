@@ -5,7 +5,7 @@
 Windows 11 x64で、次のものを用意します。
 
 - Git
-- .NET SDK 10.0.403（使用するバージョンは`global.json`で指定）
+- .NET SDK 10.0.203（`global.json`で固定。別のSDKへ自動的に切り替えない）
 - Visual Studio 2022またはBuild Toolsの「C++によるデスクトップ開発」（MSVC x64とWindows SDKを含む）
 
 PowerShellでリポジトリをクローンし、フォルダーへ移動します。
@@ -34,11 +34,11 @@ C++のDLL作成、NuGetパッケージの復元、アプリのビルドをまと
 ./scripts/test.ps1
 ```
 
-検証用アプリをビルドし、テスト用の動画を生成して実行します。小さい出力ウィンドウと合成LTCを使用します。
+PowerShell 7.2以降で実行します。検証用アプリを専用フォルダーへビルドし、テスト用の動画と音声の時刻差素材を生成して実行します。小さい出力ウィンドウと合成LTCを使用します。
 
 FFmpeg・ffprobeをPathに追加しておいてください。FFmpegにはlibx264、AAC、HAP、PCM、MP3（libmp3lame）のエンコーダーが必要です。
 
-結果は`artifacts/tests-日時/`へ保存します。検証状況と既知の未解決項目は[配布前の確認記録](releases/0.1.0-preview.2.md)を参照してください。
+結果は`artifacts/tests-日時/`へ保存します。`summary.json`に各試験の合否・件数・終了コード・実行時間、`manifest.json`に使用バイナリと素材のSHA-256を記録します。失敗時は終了コードが非ゼロになります。実行手順・対象・除外項目は[一括検証](VERIFICATION.md)を参照してください。
 
 </details>
 

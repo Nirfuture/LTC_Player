@@ -1,9 +1,11 @@
 namespace LtcPlayer.App;
+
+// Both manual and LTC sources publish into the host's persistent full-size canvas.
 public sealed class PreviewProgramPresentation : IProgramPresentation
 {
- readonly global::LtcPlayer.Avalonia.PreviewHost host;readonly OutputDisplay display;
- public PreviewProgramPresentation(global::LtcPlayer.Avalonia.PreviewHost host,OutputDisplay display){this.host=host;this.display=display;}
- public void Present(VideoFrame frame)=>host.Present(frame.TextureFormat==0?frame with{TextureFormat=3,Width=display.Width,Height=display.Height}:frame);
- public void Refresh()=>host.RefreshCover();
- public void Dispose(){}
+    readonly global::LtcPlayer.Avalonia.PreviewHost host;
+    public PreviewProgramPresentation(global::LtcPlayer.Avalonia.PreviewHost host)=>this.host=host;
+    public void Present(VideoFrame frame)=>host.Present(frame);
+    public void Refresh()=>host.RefreshCover();
+    public void Dispose(){} // Canvas lifetime belongs to the host, not this source.
 }

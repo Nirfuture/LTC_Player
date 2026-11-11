@@ -1,48 +1,28 @@
-# LTC Player 0.1.0-preview.9
+# LTC Player 0.1.0-preview.10
 
-Windows 11 x64向けのプレビュー版です。
-
-## ダウンロード
-
-[Windows用アプリをダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.9/LtcPlayer-0.1.0-preview.9-win-x64.zip)
-
-必要なのは、このZIPだけです。
-
-実行用ZIPを展開し、フォルダー内の`LtcPlayer.Avalonia.exe`を起動してください。
-
-[クイックスタート](https://github.com/Nirfuture/LTC_Player/blob/main/docs/QUICKSTART.md)
+Windows 11 x64向けの未署名プレビュー版。別PC・実機での検証に使用するテスト用プレリリースです。
 
 ## 変更点
 
-- 外部出力を開始する前も、LTCに同期した映像を画面内で確認できます。LTC受信中は手動操作より同期を優先し、信号が途切れると映像を保持します。
-- 設定画面で蓋画（PNG・JPEG）を登録できます。未登録時は黒です。
-- プレビュー下の「蓋画」で、映像と蓋画を指定時間でフェード切り替えできます。0秒で即時切り替え、途中での反転にも対応します。
-- 蓋画表示中もLTC同期を続け、解除すると現在位置の映像へ戻ります。プレビューと外部出力へ同じ合成を適用します。
-- LTC停止中の確認再生は、出力開始・停止時にキューと再生位置を引き継ぎます。
+- 同じ合成映像をプレビューと外部ディスプレイへ渡し、出力開始・停止で再生位置やフェードをリセットしない構成へ整理。
+- 手動再生・LTC同期の音声出力を統一。起動時OFF、スピーカーボタンと音量で操作し、音声出力先は設定で選択。
+- シークを映像直下へ配置し、再生情報を常時表示。蓋絵の登録、切替時間、アイコン、横長・縦長レイアウトを整理。
+- 設定を適用してもパネルを閉じず、未適用の変更を強調。LTC入力ピークを設定へ追加。
+- 低いウィンドウや警告表示でキュー上端が移動する問題を修正。
+- 有効チェックを1クリックに変更し、ドラッグ範囲・挿入線・ヘッダー表示を改善。ファイル名の右クリックで保存場所を表示。
+- 設定保存失敗時の不整合、未接続出力先の自動置換、並べ替えによる再生の再起動を修正。描画障害の影響範囲を通知。
+- 自動検証を一元化し、旧試験を現行経路へ移行。ライセンスと操作資料を整理。
 
-出力キューのハイライト、ドラッグ挿入線、縦長画面への対応なども含みます。
+## 起動
 
-## 確認が必要な点
+ZIPをすべて展開して`LtcPlayer.Avalonia.exe`を起動します。.NET Desktop Runtime・SDKの追加導入は不要です。Visual C++ v14 x64ランタイムとFFmpeg/ffprobeは別途必要です。
 
-別のPCでの動作、長時間の連続稼働、物理ディスプレイ上の同期精度は未確認です。使用する環境で事前に確認してください。
+[クイックスタート](docs/QUICKSTART.md) · [対応環境](docs/COMPATIBILITY.md) · [困ったとき](docs/TROUBLESHOOTING.md)
 
-このプレビュー版は未署名です。Smart App Controlが有効な環境では、起動をブロックされる場合があります。
+## 確認範囲
 
-検証状況と未解決項目は[配布前の確認記録](https://github.com/Nirfuture/LTC_Player/blob/main/docs/releases/0.1.0-preview.9.md)を参照してください。
+自動検証、失敗注入、内部PTSとGPU画像の確認と、実機の同期品質は別に扱います。実LTC・機器切断・別PC・長時間運転・物理的な映像/音声遅延は確認が残っています。詳しくは[候補の確認記録](docs/releases/0.1.0-preview.10.md)を参照してください。
 
-[対応環境・ファイル形式](https://github.com/Nirfuture/LTC_Player/blob/main/docs/COMPATIBILITY.md) · [困ったとき](https://github.com/Nirfuture/LTC_Player/blob/main/docs/TROUBLESHOOTING.md)
+未署名のためSmart App Controlで起動をブロックされる場合があります。これは署名済みリリースではありません。
 
-<details>
-<summary>開発・配布ファイルの照合</summary>
-
-開発する場合は、リポジトリをクローンしてください。
-
-```sh
-git clone https://github.com/Nirfuture/LTC_Player.git
-```
-
-環境の準備は[ビルド手順](https://github.com/Nirfuture/LTC_Player/blob/main/docs/BUILD.md)を参照してください。
-
-Assetsには、配布物に対応するソースの控え（`source.zip`）、照合用の`SHA256SUMS.txt`、ビルド情報の`MANIFEST.json`、署名状態の`SIGNATURES.json`も置いています。
-
-</details>
+配布物の`MANIFEST.json`でソースの扱いを確認できます。作業ツリー候補は正式なコミット指定リリースとは区別し、対応ソースZIPとハッシュ一覧を同梱します。正式版ではありません。

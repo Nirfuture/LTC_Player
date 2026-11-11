@@ -8,6 +8,8 @@ public record ProgramObservation(SyncState State,string Ltc,Guid? CueId,Guid? Pr
     public double? LagSeconds{get;init;}
     public bool Recovering{get;init;}
     public int RecoveryAttempts{get;init;}
+    public ScheduledCue? ScheduledCue{get;init;}
+    public double TargetHostSeconds{get;init;}
     public int InputGeneration{get;init;}
     public OutputPresentationMode OutputMode{get;init;}
     public bool Manual{get;init;}
@@ -79,7 +81,7 @@ public sealed class ProgramPlayback
                     double stamp=MasterClock.Timestamp();if(stamp>=nextMonitorSample){monitorStatus=renderer.MonitorStatus();nextMonitorSample=stamp+1;}
                     int error=monitorStatus?.Error??0;if(error!=0&&!monitorFaultNotified){monitorFaultNotified=true;monitorError?.Invoke(error);}
                 });
-                var s=clock.Read();double now=s.Seconds+offset;
+                double targetHost=MasterClock.Timestamp();var s=clock.Read(targetHost);double now=s.Seconds+offset;
                 lag=null;
                 string warning="";byte[]? pixels=null;VideoFrame? texture=null;
                 bool unavailable=s.State is SyncState.WAITING or SyncState.LOST;
@@ -162,7 +164,7 @@ public sealed class ProgramPlayback
                     if(verify)verificationPixel=BitConverter.ToUInt32(verifiedPixels!,(verifiedPixels!.Length/8)*4);
                 }
                 else await dispatcher.InvokeAsync(()=>{if(presentation!=null)presentation.Refresh();else if(cover!=null&&coverBinding.Apply(cover,renderer!))renderer!.Redraw();});
-                observe(new(s.State,s.Label,displayedId,preload?.Cue.CueId,now,displayedPts,presented,skipped,repeated,seeks,warning){VerificationPixelBgra=verificationPixel,Monitor=monitorStatus,LagSeconds=lag,Recovering=recovery!=null,RecoveryAttempts=recoveryAttempts,InputGeneration=s.Generation,OutputMode=renderer?.OutputMode??outputMode,Manual=manual,Holding=manualHolding});
+                observe(new(s.State,s.Label,displayedId,preload?.Cue.CueId,now,displayedPts,presented,skipped,repeated,seeks,warning){ScheduledCue=selected,TargetHostSeconds=targetHost,VerificationPixelBgra=verificationPixel,Monitor=monitorStatus,LagSeconds=lag,Recovering=recovery!=null,RecoveryAttempts=recoveryAttempts,InputGeneration=s.Generation,OutputMode=renderer?.OutputMode??outputMode,Manual=manual,Holding=manualHolding});
                 await Task.Delay(8,token).ConfigureAwait(false);
             }
         }

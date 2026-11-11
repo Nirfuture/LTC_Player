@@ -13,9 +13,10 @@ public sealed class CueRow : INotifyPropertyChanged
     public string Seconds{get=>seconds;set{seconds=value;Changed();}}
     public string Frames{get=>frames;set{frames=value;Changed();}}
     public bool Enabled{get=>enabled;set{enabled=value;Changed();}}
-    public string Warning{get=>warning;set{warning=value;Changed();Changed(nameof(WarningMark));}}
+    public string Warning{get=>warning;set{warning=value;Changed();Changed(nameof(WarningMark));Changed(nameof(IssueText));}}
     public string WarningMark=>Warning==""?"":"⚠";
-    public string Error{get=>error;set{error=value;Changed();}}
+    public string Error{get=>error;set{error=value;Changed();Changed(nameof(IssueText));}}
+    public string IssueText=>string.Join(" / ",new[]{Error,Warning}.Where(x=>!string.IsNullOrWhiteSpace(x)));
     public int PixelWidth{get;set;}
     public int PixelHeight{get;set;}
     public double Duration{get;set;}

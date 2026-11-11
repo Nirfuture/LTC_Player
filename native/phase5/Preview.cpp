@@ -74,3 +74,5 @@ extern "C" __declspec(dllexport) int __cdecl preview_size(void* handle,int* widt
 
 extern "C" __declspec(dllexport) void __cdecl preview_window_destroy(HWND window){if(IsWindow(window))DestroyWindow(window);}
 
+
+#include "Canvas.inc"

@@ -16,10 +16,10 @@ public partial class MainWindow : Window
  internal PreviewHost Surface=>Control<PreviewHost>("PreviewSurface");
  readonly DispatcherTimer timer=new(){Interval=TimeSpan.FromMilliseconds(100)};
  InputSettings settings=new();bool busy,armed,closeAllowed,closing,updatingSeek,dragging,scrubbing,rebinding;long selectionVersion;
- CancellationTokenSource? productionCancel;Task? production;
+ CancellationTokenSource? productionCancel;
  TaskCompletionSource? armPrepared;
  ProgramObservation? observation;
- CueRow? dragged;Point dragOrigin;
+ CueRow? dragged,previewSelection;Point dragOrigin;
  internal bool IsArmed=>armed;
  internal ProgramObservation? LatestObservation=>observation;
  T Control<T>(string name)where T:Control=>this.FindControl<T>(name)!;
@@ -29,14 +29,19 @@ public partial class MainWindow : Window
  public MainWindow()
  {
   AvaloniaXamlLoader.Load(this);Grid.ItemsSource=Editor.Rows;
+#if VERIFICATION
+  // Presentation assertions require an unoccluded test surface. Do not change
+  // the product's window policy or treat an occluded presentation as displayed.
+  if(Program.Arguments.Any(a=>a.StartsWith("--verify-",StringComparison.Ordinal)))Topmost=true;
+#endif
   AddHandler(PointerPressedEvent,(_,e)=>TracePointer("press",e),RoutingStrategies.Tunnel,true);
   AddHandler(PointerReleasedEvent,(_,e)=>TracePointer("release",e),RoutingStrategies.Tunnel,true);
-  Preview=new(Surface);Preview.Changed+=UpdatePreview;InitializeResponsiveLayout();InitializePresentation();
+  activityDelay.Tick+=(_,_)=>UpdateActivity();
+  Preview=new(Surface);playback=new(Preview,Surface,()=>monitor.Clock,cover);playback.Failed+=OnPlaybackFailed;Preview.Changed+=UpdatePreview;InitializeResponsiveLayout();InitializePresentation();
   Control<Grid>("PreviewViewport").SizeChanged+=(_,_)=>UpdatePreviewGeometry();
   Editor.Changed+=()=>{Control<TextBlock>("ProgramInfo").Text=Editor.ValidationMessage;UpdateEnabled();};
   Grid.SelectionChanged+=async(_,_)=>await SelectPreviewAsync();
   Control<Slider>("Volume").PropertyChanged+=(_,e)=>{if(e.Property.Name=="Value")ApplyVolume();};
-  Control<CheckBox>("Mute").IsCheckedChanged+=(_,_)=>ApplyVolume();
   DragDrop.AddDragOverHandler(Grid,DragOver);DragDrop.AddDropHandler(Grid,Drop);
   Grid.PointerCaptureLost+=(_,_)=>CancelCueDrag();
   Deactivated+=(_,_)=>CancelCueDrag();
@@ -71,12 +76,30 @@ public partial class MainWindow : Window
    if(loadDefault&&!File.Exists(Program.Option("--settings")??InputSettings.PathName))settings=settings with{Rate="29.97 DF"};
    Editor.Rate=TimecodeRate.Modes.FirstOrDefault(r=>r.Name==settings.Rate)??TimecodeRate.Modes[1];
    LoadOutputSelection();await LoadPresentationSettingsAsync();
+   if(!Program.Arguments.Any(a=>a.StartsWith("--verify-",StringComparison.Ordinal))||Program.Option("--verify-audio-ui")!=null||Program.Option("--verify-preview-ui")!=null||Program.Option("--verify-ui-design")!=null||Program.Option("--verify-ui-corrections")!=null)await InitializeAudioUiAsync();
    await monitor.ConfigureAsync(settings);timer.Start();await Task.Delay(200);Surface.Black();Editor.Validate();StatusMessage("準備完了。動画を追加してください。");
    if(Program.Option("--program") is {} file)await Edit(()=>Editor.LoadAsync(file));
    else if(loadDefault)await Edit(()=>DefaultTestShow.LoadAsync(Editor));
 
    presentationReady=true;
 #if VERIFICATION
+   if(Program.Option("--verify-resize-anchor") is {} resizeFolder)await ResizeAnchorVerification.RunAsync(this,resizeFolder);
+   else if(Program.Option("--verify-audio-start") is {} audioStartFolder)await AudioStartVerification.RunAsync(this,audioStartFolder);
+   else if(Program.Option("--verify-rendering-health") is {} healthFolder)await RenderingHealthVerification.RunAsync(this,healthFolder);
+   else if(Program.Option("--verify-settings-apply") is {} settingsApplyFolder)await SettingsApplyVerification.RunAsync(this,settingsApplyFolder);
+   else if(Program.Option("--verify-input-level") is {} inputLevelFolder)await InputLevelVerification.RunAsync(this,inputLevelFolder);
+   else if(Program.Option("--verify-ui-corrections") is {} correctionsFolder)await UiCorrectionsVerification.RunAsync(this,correctionsFolder);
+   else if(Program.Option("--verify-ui-design") is {} designFolder)await UiDesignVerification.RunAsync(this,designFolder);
+   else if(Program.Option("--verify-coordinator") is {} coordinatorFolder)await CoordinatorVerification.RunAsync(this,coordinatorFolder);
+   else if(Program.Option("--verify-preview-ui") is {} previewUiFolder)await PreviewUiVerification.RunAsync(this,previewUiFolder);
+   else if(Program.Option("--verify-audio-ui") is {} audioUiFolder)await AudioUiVerification.RunAsync(this,audioUiFolder);
+   else if(Program.Option("--verify-audio-connected") is {} audioConnectedFolder)await AudioConnectedVerification.RunAsync(this,audioConnectedFolder);
+   else if(Program.Option("--verify-audio-service") is {} audioServiceFolder)await AudioServiceVerification.RunAsync(this,audioServiceFolder);
+   else if(Program.Option("--verify-audio-decode") is {} audioDecodeFolder)await AudioDecodeVerification.RunAsync(this,audioDecodeFolder);
+   if(Program.Option("--verify-audio-foundation") is {} audioFoundationFolder)await AudioFoundationVerification.RunAsync(this,audioFoundationFolder);
+   if(Program.Option("--verify-playback-integration") is {} integrationFolder)await PlaybackIntegrationVerification.RunAsync(this,integrationFolder);
+   if(Program.Option("--verify-redesign-baseline") is {} baselineFolder)await RedesignBaselineVerification.RunAsync(this,baselineFolder);
+   if(Program.Option("--verify-shared-canvas") is {} canvasFolder)await SharedCanvasVerification.RunAsync(this,canvasFolder);
    if(Program.Option("--verify-presentation") is {} presentationFolder)await PresentationVerification.RunAsync(this,presentationFolder);
    if(Program.Option("--verify-cue-ux") is {} cueUxFolder)await CueUxVerification.RunAsync(this,cueUxFolder);
    if(Program.Option("--verify-manual-output") is {} manualFolder)await ManualOutputVerification.RunAsync(this,manualFolder);
@@ -97,10 +120,10 @@ public partial class MainWindow : Window
    if(Program.Option("--verify-delivery-operations") is {} deliveryFolder)await DeliveryOperationsVerification.RunAsync(this,deliveryFolder);
    if(Program.Option("--verify-default-show") is {} defaultFolder)await DefaultTestShow.VerifyAsync(this,defaultFolder);
 #endif
-  }catch(Exception e){StatusMessage(e.Message);var folder=Program.Option("--verify-phase5")??Program.Option("--verify-ui-update")??Program.Option("--verify-monitor")??Program.Option("--verify-preview-recovery")??Program.Option("--verify-delivery-operations")??Program.Option("--verify-default-show");if(folder!=null){Directory.CreateDirectory(folder);File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());Shutdown(1);}}
+  }catch(Exception e){StatusMessage(e.Message);var folder=Program.Option("--verify-rendering-health")??Program.Option("--verify-resize-anchor")??Program.Option("--verify-audio-start")??Program.Option("--verify-settings-apply")??Program.Option("--verify-input-level")??Program.Option("--verify-ui-corrections")??Program.Option("--verify-ui-design")??Program.Option("--verify-coordinator")??Program.Option("--verify-preview-ui")??Program.Option("--verify-audio-ui")??Program.Option("--verify-audio-connected")??Program.Option("--verify-audio-service")??Program.Option("--verify-audio-decode")??Program.Option("--verify-audio-foundation")??Program.Option("--verify-playback-integration")??Program.Option("--verify-redesign-baseline")??Program.Option("--verify-shared-canvas")??Program.Option("--verify-phase5")??Program.Option("--verify-ui-update")??Program.Option("--verify-monitor")??Program.Option("--verify-preview-recovery")??Program.Option("--verify-delivery-operations")??Program.Option("--verify-default-show");if(folder!=null){Directory.CreateDirectory(folder);File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());Shutdown(1);}}
  }
  internal static void Shutdown(int code){if(Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime d)d.Shutdown(code);}
- async Task Safe(Func<Task> action){try{await action();}catch(Exception e){StatusMessage(e.Message);}}
+ async Task Safe(Func<Task> action){try{await action();}catch(OperationCanceledException){}catch(Exception e){StatusMessage(e.Message);}}
  async Task Edit(Func<Task> action)
  {
   if(busy||armed||closing)return;busy=true;UpdateEnabled();
@@ -109,28 +132,42 @@ public partial class MainWindow : Window
  }
  async Task SelectPreviewAsync()
  {
-  long version=++selectionVersion;
   if(armed||closing||rebinding||LtcHasPriority||SyncOwnsSurface||Grid.SelectedItem is not CueRow row)return;
+  // DataGrid may deliver the same programmatic selection after its next layout.
+  // A drag consumes that selection without changing the current media source.
+  if(ReferenceEquals(previewSelection,row))return;
+  previewSelection=row;long version=++selectionVersion;
   previewCue=row.CueId;CancelScrub();
   await Safe(async()=>{await Preview.LoadAsync(row.FilePath);if(version!=selectionVersion)return;UpdatePreview(Preview.Snapshot);});
  }
- void ApplyVolume()=>Preview?.SetVolume(Control<Slider>("Volume").Value,Control<CheckBox>("Mute").IsChecked==true);
+ void ApplyVolume(){double value=Control<Slider>("Volume").Value;bool mute=false;Preview?.SetVolume(value,mute);playback.SetVolume((float)value,mute);if(audioUiReady){settings=settings with{AudioVolume=value};try{SaveSettings();}catch(Exception e){StatusMessage(e.Message);}}}
+ void SetPreviewTimes(double? position,double? duration,double rate){var left=MediaTimeDisplay.Format(position,rate);var right=MediaTimeDisplay.Format(duration,rate);Control<TextBlock>("PreviewPosition").Text=left;Control<TextBlock>("PreviewDuration").Text=right;Control<TextBlock>("PreviewTime").Text=left+" / "+right;}
  void UpdatePreview(PreviewSnapshot p)
  {
-  UpdateRowControls();UpdateActivity();UpdatePreviewGeometry();if(armed||SyncOwnsSurface||LtcHasPriority)return;
+  if(p.State==PreviewState.Error&&armed)_ = Safe(async()=>{await DisarmAsync();StatusMessage("再生エラー："+p.Notice);});
+  UpdateRowControls();UpdateActivity();UpdatePreviewGeometry();if(SyncOwnsSurface||LtcHasPriority)return;
   Control<TextBlock>("PreviewName").Text=p.Name==""?"キューを選択してください":p.Name;
-  Control<TextBlock>("PreviewTime").Text=$"{MediaTimeDisplay.Format(p.Position,Preview.FrameRate)} / {MediaTimeDisplay.Format(p.Duration,Preview.FrameRate)}";
-  Control<TextBlock>("PreviewInfo").Text=$"{p.State} / {p.Notice}";
+  SetPreviewTimes(p.Position,p.Duration,Preview.FrameRate);
+  UpdatePreviewNotice(p.State==PreviewState.Error?p.Notice:"");
   var slider=Control<Slider>("Seek");slider.Maximum=Math.Max(.001,p.Duration);
   if(!scrubbing&&!keyboardSeeking){updatingSeek=true;slider.Value=p.Position;updatingSeek=false;}
  }
+ readonly DispatcherTimer activityDelay=new(){Interval=TimeSpan.FromMilliseconds(50)};
+ double activitySince;
  void UpdateActivity()
  {
   bool waiting=busy||Preview.IsBusy||delivery is DeliveryState.Starting or DeliveryState.Stopping;
-  Control<ProgressBar>("ActivityBar").IsVisible=waiting;
-  var label=Control<TextBlock>("ActivityLabel");label.IsVisible=waiting;
-  label.Text=delivery==DeliveryState.Starting?"出力を準備中…":delivery==DeliveryState.Stopping?"出力を停止中…":Preview.IsBusy?Preview.BusyMessage:busy?"処理中…":"";
-  Control<Slider>("Seek").IsEnabled=!Preview.IsBusy&&!busy&&!armed&&!LtcHasPriority&&!SyncOwnsSurface;
+  SetActivity(waiting,delivery==DeliveryState.Starting?"出力を準備中…":delivery==DeliveryState.Stopping?"出力を停止中…":Preview.IsBusy?Preview.BusyMessage:busy?"処理中…":"");
+  Control<Slider>("Seek").IsEnabled=!Preview.IsBusy&&!busy&&!armed&&!LtcHasPriority&&!SyncOwnsSurface&&(!Surface.Ready||Surface.Canvas.SharedDeviceError==0);
+ }
+ internal void SetActivity(bool waiting,string message)
+ {
+  if(waiting&&activitySince==0){activitySince=MasterClock.Timestamp();activityDelay.Start();}
+  if(!waiting){activitySince=0;activityDelay.Stop();}
+  bool visible=waiting&&MasterClock.Timestamp()-activitySince>=.18;
+  var bar=Control<ProgressBar>("ActivityBar");bar.Opacity=visible?1:0;bar.IsIndeterminate=visible;
+  var label=Control<TextBlock>("ActivityLabel");label.Opacity=visible?1:0;
+  label.Text=message;
  }
  void UpdateEnabled()
  {
@@ -138,7 +175,7 @@ public partial class MainWindow : Window
   Control<StackPanel>("EditorTools").IsEnabled=edit;Grid.IsEnabled=!busy&&!closing;Grid.IsReadOnly=armed;
 
   UpdateDeliveryButton();
-  Control<StackPanel>("PreviewControls").IsVisible=!armed&&!SyncOwnsSurface;UpdateRowControls();
+  Control<StackPanel>("PreviewControls").IsVisible=true;UpdateRowControls();
  }
  async void AddClick(object? s,RoutedEventArgs e)
  {
@@ -149,7 +186,7 @@ public partial class MainWindow : Window
  async void CloneClick(object? s,RoutedEventArgs e){if(Grid.SelectedItem is CueRow row)await Edit(async()=>{RebindGrid(Editor.Clone(row));await SelectPreviewAsync();});}
  void RebindGrid(CueRow row)
  {
-  rebinding=true;try{Grid.ItemsSource=null;Grid.ItemsSource=Editor.Rows;Grid.SelectedItem=row;}finally{rebinding=false;}
+  bool previous=rebinding;rebinding=true;try{Grid.ItemsSource=null;Grid.ItemsSource=Editor.Rows;Grid.SelectedItem=row;}finally{rebinding=previous;}
  }
  async void SaveClick(object? s,RoutedEventArgs e)
  {
@@ -180,7 +217,7 @@ public partial class MainWindow : Window
   int from=Editor.Rows.IndexOf(row),target=InsertionMoveIndex(from,cueInsertionSlot);
   CancelCueDrag();e.Pointer.Capture(null);e.Handled=true;
   if(armed||busy||!move||target<0||target==from)return;
-  try{Editor.Move(row,target);RebindGrid(row);StatusMessage("表示順を変更しました。");}catch(Exception ex){StatusMessage(ex.Message);}
+  try{MoveCue(row,target);}catch(Exception ex){StatusMessage(ex.Message);}
  }
  void DragOver(object? s,DragEventArgs e){e.DragEffects=!armed&&!busy&&e.DataTransfer.Formats.Contains(DataFormat.File)?DragDropEffects.Copy:DragDropEffects.None;e.Handled=true;}
  async void Drop(object? s,DragEventArgs e)

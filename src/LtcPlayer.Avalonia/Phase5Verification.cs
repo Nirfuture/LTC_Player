@@ -18,7 +18,7 @@ public static class Phase5Verification
   {
    try{results.Add(new{test=name,status="PASS",detail=await action()});}
    catch(Exception e){failed=true;results.Add(new{test=name,status="FAIL",detail=e.ToString()});}
-   finally{await player.SetArmedAsync(false);await player.StopAsync();}
+   finally{await window.DisarmAsync();await window.StopSyncPreviewAsync();await window.Monitor.ConfigureAsync(new());await player.SetArmedAsync(false);await player.StopAsync();}
    await File.WriteAllTextAsync(Path.Combine(folder,"results.json"),JsonSerializer.Serialize(results,new JsonSerializerOptions{WriteIndented=true}));
   }
   try {
@@ -64,20 +64,20 @@ public static class Phase5Verification
     await player.LoadAsync(Path.Combine(fixtures,"h264-mp3.mp4"));await player.PlayAsync();await Until(()=>player.Snapshot.Position>.2);
     Assert(player.Snapshot.Audio==null&&player.Snapshot.Notice.Contains("対象外"),"unsupported audio was not explicit");return player.Snapshot;
    });
-   await Test("stop resets and closes preview resources",async()=>{
+   await Test("stop holds frame and closes audio resources",async()=>{
     await player.LoadAsync(aac);await player.PlayAsync();await Until(()=>player.Snapshot.Position>.2);await player.StopAsync();
-    var pixels=window.Surface.Readback();Assert(pixels.Where((_,i)=>i%4!=3).All(x=>x==0),"stop not black");Assert(player.Snapshot.Position==0&&PreviewAudio.ActiveStreams==0,"stop leaked audio");
-    return new{player.Snapshot,ActiveAudioStreams=PreviewAudio.ActiveStreams,Black=true};
+    var pixels=window.Surface.Readback();Assert(pixels.Where((_,i)=>i%4!=3).Any(x=>x>0),"stop lost held image");Assert(player.Snapshot.Position>0&&player.Snapshot.State==PreviewState.Stopped&&PreviewAudio.ActiveStreams==0,"stop leaked audio or position");
+    return new{player.Snapshot,ActiveAudioStreams=PreviewAudio.ActiveStreams,Holding=true};
    });
    await Test("playing resize preserves audio/video session",async()=>{
     await player.LoadAsync(aac);await player.PlayAsync();await Until(()=>player.Snapshot.Position>.2);var before=player.Snapshot;
     window.Width=1250;window.Height=850;await Task.Delay(220);window.Width=700;window.Height=1100;await Task.Delay(220);window.Width=1500;window.Height=940;await Task.Delay(220);
     Assert(player.Snapshot.State==PreviewState.Playing&&player.Snapshot.Position>before.Position+.2&&PreviewAudio.ActiveStreams==1,"resize broke playback");return player.Snapshot;
    });
-   await Test("failed load clears prior media and audio",async()=>{
+   await Test("failed load keeps last valid media and closes audio",async()=>{
     await player.LoadAsync(aac);await player.PlayAsync();await Until(()=>player.Snapshot.Position>.1);bool missing=false;
     try{await player.LoadAsync(Path.Combine(fixtures,"missing.mp4"));}catch(FileNotFoundException){missing=true;}
-    Assert(missing&&player.Snapshot.State==PreviewState.Empty&&player.LoadedPath==""&&PreviewAudio.ActiveStreams==0,"failed load retained prior media");
+    Assert(missing&&player.Snapshot.State==PreviewState.Paused&&player.LoadedPath==aac&&PreviewAudio.ActiveStreams==0,"failed load lost valid media or retained audio");
     return new{MissingRejected=missing,State=player.Snapshot.State,AudioStreams=PreviewAudio.ActiveStreams};
    });
    await Test("ARM cancels audio; service guards; synthetic production renders",async()=>{
@@ -85,7 +85,7 @@ public static class Phase5Verification
     await player.LoadAsync(aac);await player.PlayAsync();await Until(()=>player.Snapshot.Position>.2);
     await window.ArmAsync(async(clock,token)=>{int i=0;while(!token.IsCancellationRequested){clock.Accept(new TcFrame{Seconds=(i/25)%60,Frame=i%25},MasterClock.Timestamp());i++;await Task.Delay(40,token);}});
     try {
-     Assert(window.IsArmed&&player.Armed&&PreviewAudio.ActiveStreams==0,"ARM did not terminate preview audio");
+     await Until(()=>player.Armed&&window.LatestObservation is {FramePts:>0});Assert(window.IsArmed&&player.Armed&&PreviewAudio.ActiveStreams==0,"ARM did not terminate preview audio");
      int blocked=0;foreach(var action in new Func<Task>[]{player.PlayAsync,()=>player.LoadAsync(pcm),()=>player.SeekAsync(1)})try{await action();}catch(InvalidOperationException){blocked++;}
      Assert(blocked==3,"preview command bypassed ARM");await Until(()=>window.LatestObservation is {Presented:>5,FramePts:>0});Assert(window.IsArmed,"production unexpectedly stopped");return new{BlockedCommands=blocked,AudioStreams=PreviewAudio.ActiveStreams,SyntheticInput=true,Observation=window.LatestObservation};
     }finally{await window.DisarmAsync();}

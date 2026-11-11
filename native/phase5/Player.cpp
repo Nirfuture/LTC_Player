@@ -25,7 +25,7 @@ extern "C" __declspec(dllexport) int __cdecl output_displays(Display* data,int c
     return (int)ds.size();
 }
 struct Output {
-    HWND window=nullptr; int width=0,height=0; bool embedded=false,ownsWindow=true,confirmClose=false,stopRequested=false;
+    HWND window=nullptr; int width=0,height=0; int externalError=0; bool offscreen=false; bool embedded=false,ownsWindow=true,confirmClose=false,stopRequested=false;
     ComPtr<IDXGISwapChain> monitor;HWND monitorWindow=nullptr;int monitorWidth=0,monitorHeight=0,monitorError=0;
     ComPtr<ID3D11Texture2D> monitorImage;ComPtr<ID3D11RenderTargetView> monitorTarget;
     ComPtr<ID3D11VertexShader> monitorVertex;ComPtr<ID3D11PixelShader> monitorShader;
@@ -97,9 +97,8 @@ extern "C" __declspec(dllexport) int __cdecl output_create_probe(const Display* 
 #include "Composite.inc"
 extern "C" __declspec(dllexport) int __cdecl output_frame(void* handle,const unsigned char* pixels,int length) {
     auto o=static_cast<Output*>(handle); if(!o || !pixels || length!=o->width*o->height*4) return E_INVALIDARG;
-    if(!IsWindow(o->window) || (!o->embedded && !o->confirmClose && (GetAsyncKeyState(VK_ESCAPE)&0x8000))) return HRESULT_FROM_WIN32(ERROR_CANCELLED);
+    if(!o->offscreen && (!IsWindow(o->window) || (!o->embedded && !o->confirmClose && (GetAsyncKeyState(VK_ESCAPE)&0x8000)))) return HRESULT_FROM_WIN32(ERROR_CANCELLED);
     try {
-        ComPtr<ID3D11Texture2D> back; Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));
         o->context->UpdateSubresource(o->upload.Get(),0,nullptr,pixels,o->width*4,0);
         o->baseImage=o->upload;return PresentComposite(o);
     } catch(HRESULT hr){return hr;}

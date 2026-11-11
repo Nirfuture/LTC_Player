@@ -41,7 +41,7 @@ public sealed class MasterClock
             bool jump=received && (error || capturedSeconds-stamp>FreewheelSeconds || Math.Abs(seconds-(anchor+capturedSeconds-stamp))>ResyncFrames/rate.Fps);
             if(jump) ++generation;
             resync=jump; anchor=seconds; stamp=capturedSeconds; received=true; error=false;
-            label=$"{tc.Hours:00}:{tc.Minutes:00}:{tc.Seconds:00}:{tc.Frame:00}";
+            label=$"{tc.Hours:00}:{tc.Minutes:00}:{tc.Seconds:00}{(rate.Drop?";":":")}{tc.Frame:00}";
         }
     }
     public void Fault(){lock(gate) error=true;}

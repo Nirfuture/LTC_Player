@@ -15,7 +15,7 @@ public static class UiUpdateVerification
   try{
    foreach(var mode in TimecodeRate.Modes)await Test("idle LTC / "+mode.Name,async()=>{
     await using var monitor=new LtcMonitorService();await monitor.ConfigureAsync(new(Rate:mode.Name),async(clock,token)=>{clock.Accept(new TcFrame{Hours=1,Drop=mode.Drop?1:0},MasterClock.Timestamp());await Task.Delay(Timeout.Infinite,token);});
-    await Until(()=>monitor.Clock.Read().Label=="01:00:00:00");await Task.Delay(90);return new{monitor.Starts,State=monitor.Clock.Read().State};
+    await Until(()=>monitor.Clock.Read().Label==(mode.Drop?"01:00:00;00":"01:00:00:00"));await Task.Delay(90);return new{monitor.Starts,State=monitor.Clock.Read().State};
    });
    await Test("single GPU surface prototype",async()=>{
     var target=w.Surface.BeginProgram();try{using var renderer=new VideoRenderer(VideoRenderer.Displays()[0]);renderer.AttachMonitor(target);var d=VideoRenderer.Displays()[0];var data=new byte[d.Width*d.Height*4];for(int i=0;i<data.Length;i+=4){data[i+1]=255;data[i+3]=255;}ulong before=renderer.MonitorStatus().Rendered;renderer.Present(data);await PreviewRecoveryVerification.Fresh(renderer,before);var bytes=renderer.MonitorReadback();var stats=renderer.MonitorStats();int p=(stats.Height/2*stats.Width+stats.Width/2)*4;Check(bytes[p+1]==255&&bytes[p]==0,"monitor frame wrong");await Task.Delay(1);return new{stats.Width,stats.Height,stats.Frames};}finally{w.Surface.EndProgram();}

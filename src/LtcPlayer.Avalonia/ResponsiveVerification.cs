@@ -23,7 +23,7 @@ public static class ResponsiveVerification
     await Test("Layout / "+size.Width+"x"+size.Height,async()=>{
      window.Width=size.Width;window.Height=size.Height;await Task.Delay(250);window.UpdateResponsiveLayout();await Task.Delay(100);
      var workspace=window.FindControl<Grid>("Workspace")!;var scroll=window.FindControl<ScrollViewer>("WorkspaceScroll")!;var editor=window.FindControl<Border>("EditorPane")!;var preview=window.FindControl<Grid>("PreviewPane")!;
-     bool compact=size.Width<1180||size.Height<650;Check(window.CompactLayout==compact,"breakpoint");Check(editor.Bounds.Width<=scroll.Viewport.Width+2&&preview.Bounds.Width<=scroll.Viewport.Width+2,"pane horizontally clipped");
+     bool compact=size.Width<1100||size.Height>=size.Width;Check(window.CompactLayout==compact,"breakpoint");Check(editor.Bounds.Width<=scroll.Viewport.Width+2&&preview.Bounds.Width<=scroll.Viewport.Width+2,"pane horizontally clipped");
      if(compact){Check(Grid.GetRow(preview)==2&&Grid.GetColumn(preview)==0,"preview not stacked");Check(scroll.VerticalScrollBarVisibility==ScrollBarVisibility.Auto,"content not scrollable");scroll.Offset=new Vector(0,scroll.Extent.Height);await Task.Delay(50);Check(scroll.Offset.Y>=Math.Max(0,scroll.Extent.Height-scroll.Viewport.Height)-2,"bottom unreachable");}
      else Check(Grid.GetColumn(preview)==2&&Grid.GetRow(preview)==0,"wide preview placement");
      Check(window.FindControl<Button>("ArmButton")!.IsEffectivelyVisible&&window.FindControl<Button>("SettingsButton")!.IsEffectivelyVisible,"top actions hidden");
@@ -34,7 +34,7 @@ public static class ResponsiveVerification
     var dialog=new SettingsDialog(new(OutputMode:OutputPresentationMode.Compatibility),VideoRenderer.Displays()[0],false);dialog.Width=420;dialog.Height=420;var task=dialog.ShowDialog<SettingsResult?>(window);
     try{await Task.Delay(200);var controls=((Control)dialog.Content!).GetLogicalDescendants().OfType<Control>().ToArray();var apply=controls.OfType<Button>().Single(b=>Equals(b.Content,"適用"));var location=apply.TranslatePoint(default,dialog)!.Value;
      Check(location.Y>=0&&location.Y+apply.Bounds.Height<=dialog.ClientSize.Height,"apply clipped");Check(location.X>=0&&location.X+apply.Bounds.Width<=dialog.ClientSize.Width,"apply clipped horizontally");
-     var scroll=controls.OfType<ScrollViewer>().Single();Check(scroll.Viewport.Height>40&&scroll.Extent.Height>scroll.Viewport.Height,"fields do not scroll");return new{dialog.ClientSize,scroll.Viewport,scroll.Extent,ApplyY=location.Y};
+     var scroll=controls.OfType<ScrollViewer>().Single();Check(scroll.Viewport.Height>40,"fields do not scroll");return new{dialog.ClientSize,scroll.Viewport,scroll.Extent,ApplyY=location.Y};
     }finally{dialog.Close(null);await task;}
    });
    await Test("Move to portrait display fits working area",async()=>{

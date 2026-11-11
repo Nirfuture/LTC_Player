@@ -59,7 +59,7 @@ public sealed class VideoRenderer : IDisposable,ICoverRenderer
     private static void Check(int code)
     {
         if (code == unchecked((int)0x800704C7)) throw new OperationCanceledException("出力ウィンドウを閉じました。");
-        if (code != 0) throw new IOException($"D3D11/DXGI失敗: 0x{code:X8}");
+        if (code < 0) throw new IOException($"D3D11/DXGI失敗: 0x{code:X8}");
     }
     public void Dispose() { ThreadCheck(); if (handle != 0) { try{Call("output_destroy",()=>{Native.output_destroy(handle);return 0;});}finally{handle=0;trace?.Dispose();} } }
     private static class Native

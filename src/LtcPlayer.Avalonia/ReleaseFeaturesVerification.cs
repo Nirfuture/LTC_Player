@@ -28,14 +28,14 @@ public static class ReleaseFeaturesVerification
    await Test("Embedded app icon",()=>{using var icon=AssetLoader.Open(new Uri("avares://LtcPlayer.Avalonia/Assets/LtcPlayer.ico"));Check(icon.ReadByte()==0&&icon.ReadByte()==0&&icon.ReadByte()==1,"ICO header");return Task.FromResult<object>("Embedded ICO available");});
    await Test("Second process exits while first remains active",async()=>{
     w.WindowState=WindowState.Minimized;
-    using var second=Process.Start(new ProcessStartInfo(Environment.ProcessPath!){UseShellExecute=false,CreateNoWindow=true})!;
+    using var second=Process.Start(new ProcessStartInfo(Environment.ProcessPath!){UseShellExecute=false,CreateNoWindow=true,ArgumentList={"--verify-secondary"}})!;
     try{await second.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));Check(second.ExitCode==0,"second instance exit code");for(int i=0;i<100&&w.WindowState==WindowState.Minimized;i++)await Task.Delay(20);Check(w.WindowState!=WindowState.Minimized,"existing window was not restored");return new{second.ExitCode,Restored=true};}
     finally{w.WindowState=WindowState.Normal;if(!second.HasExited){second.Kill();await second.WaitForExitAsync();}}
    });
    await Test("Loading, playback preparation, seek and failure clear activity",async()=>{
     var changes=new List<(bool Busy,string Message)>();void Changed(PreviewSnapshot s){
      changes.Add((w.Preview.IsBusy,w.Preview.BusyMessage));
-     Check(w.FindControl<ProgressBar>("ActivityBar")!.IsVisible==w.Preview.IsBusy,"activity bar visibility");
+     Check(w.FindControl<Grid>("ActivitySlot")!.Bounds.Height==28,"activity slot changed height");if(!w.Preview.IsBusy)Check(w.FindControl<ProgressBar>("ActivityBar")!.Opacity==0,"idle progress visible");
      if(w.Preview.IsBusy)Check(!w.FindControl<Slider>("Seek")!.IsEnabled,"seek disabled while loading");
     }w.Preview.Changed+=Changed;
     try {
@@ -43,7 +43,7 @@ public static class ReleaseFeaturesVerification
      changes.Clear();await w.Preview.PlayAsync();Check(changes.Any(x=>x.Busy&&x.Message.Contains("準備")),"play activity");await w.Preview.PauseAsync();
      changes.Clear();await w.Preview.SeekAsync(1);Check(changes.Any(x=>x.Busy&&x.Message.Contains("再生位置"))&&!w.Preview.IsBusy,"seek activity");
      try{await w.Preview.LoadAsync(Path.Combine(folder,"missing.mov"));throw new Exception("missing file accepted");}catch(IOException){}
-     Check(!w.Preview.IsBusy&&w.Preview.Snapshot.State==PreviewState.Empty&&w.Preview.LoadedPath=="","failure state");
+     Check(!w.Preview.IsBusy&&w.Preview.Snapshot.State==PreviewState.Paused&&w.Preview.LoadedPath!="","failure state");
      await w.Preview.LoadAsync(Path.Combine(AppContext.BaseDirectory,"TestMedia","HAP_1_1080p_2997_10s.mov"));return new{Recovered=w.Preview.Snapshot.State.ToString()};
     }finally{w.Preview.Changed-=Changed;await w.Preview.StopAsync();}
    });

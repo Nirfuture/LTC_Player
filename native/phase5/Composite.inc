@@ -34,7 +34,12 @@ static int PresentComposite(Output* o){
    auto sampler=o->compositeSampler.Get();o->context->PSSetSamplers(0,1,&sampler);auto cb=o->compositeConstants.Get();o->context->PSSetConstantBuffers(0,1,&cb);o->context->Draw(3,0);
    ID3D11ShaderResourceView* clear[2]={};o->context->PSSetShaderResources(0,2,clear);o->context->OMSetRenderTargets(0,nullptr,nullptr);result=o->compositeImage;
   }
-  ComPtr<ID3D11Texture2D> back;Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));o->context->CopyResource(back.Get(),result.Get());o->last=result;return o->swap->Present(o->embedded?0:1,0);
+  o->last=result;
+  if(!o->swap)return S_OK;
+  try{
+   ComPtr<ID3D11Texture2D> back;Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));o->context->CopyResource(back.Get(),result.Get());HRESULT hr=o->swap->Present(o->embedded?0:1,0);
+   if(o->offscreen&&FAILED(hr)){o->externalError=hr;return S_OK;}return hr;
+  }catch(HRESULT hr){if(o->offscreen){o->externalError=hr;return S_OK;}throw;}
  }catch(HRESULT hr){return hr;}
 }
 extern "C" __declspec(dllexport) int __cdecl output_cover(void* handle,const unsigned char* pixels,int width,int height){
@@ -47,4 +52,4 @@ extern "C" __declspec(dllexport) int __cdecl output_cover(void* handle,const uns
  }catch(HRESULT hr){return hr;}
 }
 extern "C" __declspec(dllexport) int __cdecl output_cover_mix(void* handle,float mix){auto o=(Output*)handle;if(!o||!std::isfinite(mix)||mix<0||mix>1)return E_INVALIDARG;o->coverMix=mix;return S_OK;}
-extern "C" __declspec(dllexport) int __cdecl output_redraw(void* handle){auto o=(Output*)handle;if(!o||!IsWindow(o->window))return E_INVALIDARG;return PresentComposite(o);}
+extern "C" __declspec(dllexport) int __cdecl output_redraw(void* handle){auto o=(Output*)handle;if(!o||(!o->offscreen&&!IsWindow(o->window)))return E_INVALIDARG;return PresentComposite(o);}

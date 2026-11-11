@@ -3,112 +3,201 @@ using LtcPlayer.App;
 namespace LtcPlayer.Avalonia;
 public enum PreviewState {Empty,Ready,Playing,Paused,Stopped,Ended,Error}
 public record PreviewSnapshot(PreviewState State,double Position,double Duration,double? FramePts,string Name,string Notice,int Presented,AudioProgress? Audio);
+
+// Manual source of the shared canvas. LTC ownership suspends this source, not the canvas.
 public sealed class PreviewPlayer : IAsyncDisposable
 {
- readonly PreviewHost host;readonly SemaphoreSlim commands=new(1);
- readonly Stopwatch clock=new();
- readonly MediaDecoder decoder=new(reuseAnalysis:true);
- double? stillPosition;
- MediaInfo? media;PreviewAudioInfo? audioInfo;string path="",errorNotice="";double origin,position;int presented;
- CancellationTokenSource? cancel;Task? loop;PreviewAudio? audio;
- PreviewState state;bool armed;float volume=.5f;bool muted;
- public PreviewSnapshot Snapshot=>new(state,position,media?.Duration??0,last?.Seconds,Path.GetFileName(path),errorNotice!=""?errorNotice:audioInfo?.Notice??"",presented,audio?.Progress);
- VideoFrame? last;
- public bool IsBusy{get;private set;}
- public string BusyMessage{get;private set;}="";
- void Activity(string message){IsBusy=message!="";BusyMessage=message;Notify();}
- public bool Armed=>armed;
- public string LoadedPath=>path;
- public double FrameRate=>media?.FrameRate??0;
- public (int Width,int Height) MediaSize=>(media?.Width??0,media?.Height??0);
- public event Action<PreviewSnapshot>? Changed;
- public PreviewPlayer(PreviewHost host)=>this.host=host;
- public void SetVolume(double value,bool mute){volume=(float)Math.Clamp(value,0,1);muted=mute;if(audio!=null)audio.Gain=muted?0:volume;}
- public async Task LoadAsync(string file)
- {
-  await commands.WaitAsync();try{
-   RejectArmed();Activity("動画を読み込み中…");await HaltAsync();media=null;audioInfo=null;path=file;position=0;errorNotice="";state=PreviewState.Empty;last=null;host.Black();Notify();
-   stillPosition=null;
-   var videoTask=Task.Run(()=>decoder.InspectAsync(file,CancellationToken.None));
-   var audioTask=Task.Run(()=>PreviewAudio.InspectAsync(file,CancellationToken.None));
-   await Task.WhenAll(videoTask,audioTask);
-   var info=await videoTask;var sound=await audioTask;
-   media=info;audioInfo=sound;path=file;position=0;state=PreviewState.Ready;
-   await StillAsync(0);Notify();
-  }catch(Exception e){if(!armed){media=null;audioInfo=null;path="";state=PreviewState.Empty;errorNotice=e.Message;}throw;}
-  finally{Activity("");commands.Release();}
- }
- public async Task PlayAsync()
- {
-  await commands.WaitAsync();try{
-   RejectArmed();if(media==null)throw new InvalidOperationException("プレビューするキューを選んでください。");
-   if(state==PreviewState.Playing)return;
-   if(state==PreviewState.Paused&&loop!=null){if(audio!=null)await audio.SetPausedAsync(false,CancellationToken.None);clock.Start();state=PreviewState.Playing;Notify();return;}
-   Activity("再生を準備中…");await HaltAsync();errorNotice="";if(position>=media.Duration-.001)position=0;
-   cancel=new();origin=position;clock.Reset();
-   if(audioInfo!.Supported){audio=new(path,position,media.Duration,muted?0:volume);try{await audio.ReadyAsync(cancel.Token);}catch{await HaltAsync();throw;}}
-   // Decode and show an initial frame before the preview audio clock starts.
-   if(last==null||stillPosition!=position)await StillAsync(position);
-   stillPosition=null;state=PreviewState.Playing;clock.Start();if(audio!=null)await audio.SetPausedAsync(false,cancel.Token);
-   loop=RunAsync(cancel.Token);Notify();
-  }catch(Exception e){if(!armed){state=PreviewState.Error;errorNotice=e.Message;await HaltAsync();}throw;}
-  finally{Activity("");commands.Release();}
- }
- public async Task PauseAsync()
- {
-  await commands.WaitAsync();try{if(state!=PreviewState.Playing)return;state=PreviewState.Paused;clock.Stop();if(audio!=null)await audio.SetPausedAsync(true,CancellationToken.None);position=CurrentPosition();Notify();}finally{commands.Release();}
- }
- public async Task StopAsync()
- {
-  await commands.WaitAsync();try{await HaltAsync();position=0;state=media==null?PreviewState.Empty:PreviewState.Stopped;host.Black();last=null;Notify();}finally{commands.Release();}
- }
- public async Task SeekAsync(double seconds)
- {
-  bool resume=false;
-  await commands.WaitAsync();try{
-   RejectArmed();if(media==null)return;resume=state==PreviewState.Playing;
-   Activity("再生位置を読み込み中…");await HaltAsync();position=Math.Clamp(seconds,0,Math.Max(0,media.Duration-.001));state=PreviewState.Paused;
-   await StillAsync(position);Notify();
-  }catch(Exception e){if(!armed){state=PreviewState.Error;errorNotice=e.Message;}throw;}
-  finally{Activity("");commands.Release();}
-  if(resume)await PlayAsync();
- }
- public async Task SetArmedAsync(bool value)
- {
-  await commands.WaitAsync();try{armed=value;if(value){await HaltAsync();position=0;state=media==null?PreviewState.Empty:PreviewState.Stopped;host.Black();last=null;}Notify();}finally{commands.Release();}
- }
- void RejectArmed(){if(armed)throw new InvalidOperationException("本番ARM中はプレビューを再生・変更できません。");}
- double CurrentPosition()=>Math.Min(media!.Duration,origin+(audio?.Progress.Seconds??clock.Elapsed.TotalSeconds));
- async Task StillAsync(double at)
- {
-  var frame=await Task.Run(async()=>{await foreach(var f in decoder.DecodeAsync(path,640,360,CancellationToken.None,at))return f;return null;});
-  stillPosition=frame!=null?at:null;
-  if(frame!=null){host.Present(frame);last=frame;presented++;}else host.Black();
- }
- async Task RunAsync(CancellationToken token)
- {
-  await using var buffer=new FrameBuffer(path,640,360,origin,token,decoder);VideoFrame? next=null,current=last;
-  try {
-   while(!token.IsCancellationRequested){
-    if(state==PreviewState.Playing){
-     if(audio?.Error is {} e)throw e;
-     position=CurrentPosition();if(audio?.Progress.Done==true&&media!.Duration-position<.1)position=media.Duration;
-     if(next==null)buffer.TryRead(out next);
-     while(next!=null&&next.Seconds<=position+.000001){current=next;next=null;buffer.TryRead(out next);}
-     if(current!=null){host.Present(current);last=current;presented++;}
-     if(position>=media!.Duration){state=PreviewState.Ended;clock.Stop();Notify();return;}
-     Notify();
+    readonly PreviewHost host;
+    readonly SemaphoreSlim commands=new(1);
+    readonly Stopwatch clock=new();
+    readonly MediaDecoder decoder=new(reuseAnalysis:true);
+    CancellationTokenSource? preparation,cancel;
+    Task? loop;
+    long request;
+    bool disposed,armed,audioSuppressed,sharedAudio;
+    MediaInfo? media;
+    PreviewAudioInfo? audioInfo;
+    PreviewAudio? audio;
+    PreviewState state;
+    VideoFrame? last;
+    string path="",errorNotice="";
+    double origin,position;
+    int presented;
+    float volume=.5f;
+    bool muted;
+    public PreviewSnapshot Snapshot=>new(state,position,media?.Duration??0,last?.Seconds,Path.GetFileName(path),errorNotice!=""?errorNotice:sharedAudio?"":audioInfo?.Notice??"",presented,audio?.Progress);
+    public bool IsBusy{get;private set;}
+    public string BusyMessage{get;private set;}="";
+    public Guid? PlaybackSessionId{get;private set;}
+    public Guid MediaSessionId{get;private set;}
+    public int SourceGeneration{get;private set;}
+    public int DecodeStarts{get;private set;}
+    public bool Armed=>armed;
+    public string LoadedPath=>path;
+    public double FrameRate=>media?.FrameRate??0;
+    public (int Width,int Height) MediaSize=>(media?.Width??0,media?.Height??0);
+    public event Action<PreviewSnapshot>? Changed;
+    public PreviewPlayer(PreviewHost host)=>this.host=host;
+    void Notify()=>Changed?.Invoke(Snapshot);
+    void Activity(string message){IsBusy=message!="";BusyMessage=message;Notify();}
+    void RejectArmed(){ObjectDisposedException.ThrowIf(disposed,this);if(armed)throw new InvalidOperationException("LTC同期中は手動再生を変更できません。");}
+    public void CancelPreparation(){request++;preparation?.Cancel();if(IsBusy)cancel?.Cancel();}
+    public void SetVolume(double value,bool mute){volume=(float)Math.Clamp(value,0,1);muted=mute;if(audio!=null)audio.Gain=muted?0:volume;}
+    public async Task LoadAsync(string file)
+    {
+        RejectArmed();CancelPreparation();long version=request;
+        using var operation=new CancellationTokenSource();preparation=operation;bool entered=false;
+        try
+        {
+            await commands.WaitAsync(operation.Token);entered=true;RejectArmed();Activity("動画を読み込み中…");
+            if(media!=null)position=CurrentPosition();
+            await HaltAsync();state=media==null?PreviewState.Empty:PreviewState.Paused;
+            var video=decoder.InspectAsync(file,operation.Token);
+            var sound=PreviewAudio.InspectAsync(file,operation.Token);
+            await Task.WhenAll(video,sound);
+            var frame=await FirstFrameAsync(file,0,operation.Token);
+            operation.Token.ThrowIfCancellationRequested();RejectArmed();if(version!=request)return;
+            MediaSessionId=Guid.NewGuid();SourceGeneration++;media=await video;audioInfo=await sound;path=file;position=origin=0;errorNotice="";state=PreviewState.Ready;
+            host.Present(frame);last=frame;presented++;Notify();
+        }
+        catch(OperationCanceledException)when(operation.IsCancellationRequested){}
+        catch(Exception e){if(version==request){errorNotice=e.Message;Notify();}throw;}
+        finally{if(ReferenceEquals(preparation,operation)){preparation=null;Activity("");}if(entered)commands.Release();}
     }
-    await Task.Delay(12,token);
-   }
-  }catch(OperationCanceledException)when(token.IsCancellationRequested){}
-  catch(Exception e){state=PreviewState.Error;errorNotice=e.Message;clock.Stop();if(audio!=null){await audio.DisposeAsync();audio=null;}Notify();}
- }
- async Task HaltAsync()
- {
-  cancel?.Cancel();if(loop!=null){await loop;loop=null;}if(audio!=null){await audio.DisposeAsync();audio=null;}
-  cancel?.Dispose();cancel=null;clock.Reset();
- }
- void Notify()=>Changed?.Invoke(Snapshot);
- public async ValueTask DisposeAsync(){await commands.WaitAsync();try{await HaltAsync();}finally{commands.Release();}}
+    public async Task PlayAsync()
+    {
+        await commands.WaitAsync();
+        try
+        {
+            RejectArmed();if(media==null)throw new InvalidOperationException("キューを選択してください。");
+            if(state==PreviewState.Playing)return;
+            if(state==PreviewState.Paused&&loop is {IsCompleted:false})
+            {
+                if(audio!=null)await audio.SetPausedAsync(false,CancellationToken.None);
+                clock.Start();state=PreviewState.Playing;Notify();return;
+            }
+            bool restart=state is PreviewState.Stopped or PreviewState.Ended;
+            Activity("再生を準備中…");await HaltAsync();if(restart||position>=media.Duration-.001)position=0;
+            errorNotice="";cancel=new();origin=position;
+            if(audioInfo!.Supported&&!audioSuppressed)
+            {
+                audio=new(path,position,media.Duration,muted?0:volume);await audio.ReadyAsync(cancel.Token);
+            }
+            // Only an explicit restart/seek needs another still decode.
+            if(last==null||Math.Abs(last.Seconds-position)>1/media.FrameRate)
+            {
+                var frame=await FirstFrameAsync(path,position,cancel.Token);cancel.Token.ThrowIfCancellationRequested();RejectArmed();
+                host.Present(frame);last=frame;presented++;
+            }
+            cancel.Token.ThrowIfCancellationRequested();RejectArmed();state=PreviewState.Playing;clock.Restart();
+            if(audio!=null)await audio.SetPausedAsync(false,cancel.Token);
+            PlaybackSessionId=Guid.NewGuid();DecodeStarts++;loop=RunAsync(cancel.Token);Notify();
+        }
+        catch(OperationCanceledException)when(armed||disposed||cancel?.IsCancellationRequested==true){await HaltAsync();state=media==null?PreviewState.Empty:PreviewState.Paused;}
+        catch(InvalidOperationException)when(armed||disposed){throw;}
+        catch(Exception e){errorNotice=e.Message;state=PreviewState.Error;await HaltAsync();throw;}
+        finally{Activity("");commands.Release();}
+    }
+    public async Task PauseAsync()
+    {
+        await commands.WaitAsync();try
+        {
+            RejectArmed();if(state!=PreviewState.Playing)return;
+            if(audio!=null)await audio.SetPausedAsync(true,CancellationToken.None);
+            position=CurrentPosition();clock.Stop();state=PreviewState.Paused;Notify();
+        }finally{commands.Release();}
+    }
+    public async Task StopAsync()
+    {
+        CancelPreparation();cancel?.Cancel();await commands.WaitAsync();try
+        {
+            if(media!=null)position=CurrentPosition();await HaltAsync();state=media==null?PreviewState.Empty:PreviewState.Stopped;
+            // Keep the displayed frame. A following Play explicitly restarts at zero.
+            Notify();
+        }finally{commands.Release();}
+    }
+    public async Task SeekAsync(double seconds)
+    {
+        RejectArmed();CancelPreparation();long version=request;
+        using var operation=new CancellationTokenSource();preparation=operation;bool entered=false,resume=false;
+        try
+        {
+            await commands.WaitAsync(operation.Token);entered=true;RejectArmed();if(media==null)return;
+            resume=state==PreviewState.Playing;Activity("再生位置を読み込み中…");await HaltAsync();state=PreviewState.Paused;
+            double at=Math.Clamp(seconds,0,Math.Max(0,media.Duration-1/media.FrameRate));
+            var frame=await FirstFrameAsync(path,at,operation.Token);operation.Token.ThrowIfCancellationRequested();RejectArmed();if(version!=request)return;
+            SourceGeneration++;position=origin=at;host.Present(frame);last=frame;presented++;Notify();
+        }
+        catch(OperationCanceledException)when(operation.IsCancellationRequested){resume=false;}
+        finally{if(ReferenceEquals(preparation,operation)){preparation=null;Activity("");}if(entered)commands.Release();}
+        if(resume&&version==request&&!armed&&!disposed)await PlayAsync();
+    }
+    public async Task SuppressAudioAsync()
+    {
+        audioSuppressed=true;await commands.WaitAsync();try
+        {
+            if(audio==null)return;
+            // Snapshot the audio clock and switch to monotonic time before disposal awaits.
+            position=CurrentPosition();origin=position;
+            if(state==PreviewState.Playing)clock.Restart();else clock.Reset();
+            var old=audio;audio=null;await old.DisposeAsync();Notify();
+        }finally{commands.Release();}
+    }
+    public async Task UseSharedAudioAsync(){sharedAudio=true;await SuppressAudioAsync();}
+    public void AllowAudioForNextPlay(){if(!sharedAudio)audioSuppressed=false;}
+    public async Task SetArmedAsync(bool value)
+    {
+        armed=value;
+        if(value){CancelPreparation();cancel?.Cancel();}
+        await commands.WaitAsync();try
+        {
+            if(value){if(media!=null)position=CurrentPosition();await HaltAsync();state=media==null?PreviewState.Empty:PreviewState.Stopped;}
+            Notify();
+        }finally{commands.Release();}
+    }
+    double CurrentPosition()=>media==null?position:Math.Min(media.Duration,origin+(audio?.Progress.Seconds??clock.Elapsed.TotalSeconds));
+    async Task<VideoFrame> FirstFrameAsync(string file,double at,CancellationToken token)
+    {
+        var size=host.CanvasSize;
+        return await Task.Run(async()=>
+        {
+            await foreach(var frame in decoder.DecodeAsync(file,size.Width,size.Height,token,at))return frame;
+            throw new InvalidDataException("表示できるフレームがありません。");
+        },token);
+    }
+    async Task RunAsync(CancellationToken token)
+    {
+        var size=host.CanvasSize;
+        try
+        {
+            await using var buffer=new FrameBuffer(path,size.Width,size.Height,origin,token,decoder);
+            VideoFrame? next=null,current=last;
+            while(!token.IsCancellationRequested)
+            {
+                if(state==PreviewState.Playing)
+                {
+                    if(audio?.Error is {} e)throw e;
+                    position=CurrentPosition();
+                    if(next==null)buffer.TryRead(out next);
+                    while(next!=null&&next.Seconds<=position+.000001){current=next;next=null;buffer.TryRead(out next);}
+                    if(current!=null&&!ReferenceEquals(current,last)){host.Present(current);last=current;presented++;}
+                    if(position>=media!.Duration){state=PreviewState.Ended;clock.Stop();if(audio!=null){await audio.DisposeAsync();audio=null;}Notify();return;}
+                    Notify();
+                }
+                await Task.Delay(8,token);
+            }
+        }
+        catch(OperationCanceledException)when(token.IsCancellationRequested){}
+        catch(Exception e){state=PreviewState.Error;errorNotice=e.Message;clock.Stop();if(audio!=null){await audio.DisposeAsync();audio=null;}Notify();}
+    }
+    async Task HaltAsync()
+    {
+        cancel?.Cancel();if(loop!=null){await loop;loop=null;}
+        if(audio!=null){await audio.DisposeAsync();audio=null;}
+        cancel?.Dispose();cancel=null;clock.Reset();
+    }
+    public async ValueTask DisposeAsync()
+    {
+        disposed=true;CancelPreparation();cancel?.Cancel();await commands.WaitAsync();try{await HaltAsync();}finally{commands.Release();}
+    }
 }

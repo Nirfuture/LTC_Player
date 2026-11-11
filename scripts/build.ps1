@@ -1,4 +1,4 @@
-param([switch]$Verification,[string]$DotnetPath='dotnet')
+param([switch]$Verification,[string]$DotnetPath='dotnet',[string]$OutputPath)
 $ErrorActionPreference='Stop'
 $env:DOTNET_GENERATE_ASPNET_CERTIFICATE='false'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT='1'
@@ -13,6 +13,7 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Restore failed'}
  $mode=if($Verification){'true'}else{'false'}
  $name=if($Verification){'verification'}else{'win-x64'}
- & $DotnetPath publish src/LtcPlayer.Avalonia --no-restore -c Release -r win-x64 --self-contained true '-p:UsedAvaloniaProducts=' "-p:EnableVerification=$mode" -o "artifacts/$name"
+ if(-not $OutputPath){$OutputPath="artifacts/$name"}
+ & $DotnetPath publish src/LtcPlayer.Avalonia --no-restore -c Release -r win-x64 --self-contained true '-p:UsedAvaloniaProducts=' "-p:EnableVerification=$mode" -o $OutputPath
  if($LASTEXITCODE -ne 0){throw 'Publish failed'}
 } finally {Pop-Location}

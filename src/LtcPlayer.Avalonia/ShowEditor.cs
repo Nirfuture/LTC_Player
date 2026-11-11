@@ -8,6 +8,9 @@ public sealed class ShowEditor
  public TimecodeRate Rate{get;set;}=TimecodeRate.Modes[1];
  public bool Locked{get;set;}
  public event Action? Changed;
+ public event Action? PlaybackChanged;
+ ScheduledCue[]? playbackDefinition;
+ TimecodeRate? validatedRate;
  public string ValidationMessage{get;private set;}="";
  public bool CanArm{get;private set;}
  void Editable(){if(Locked)throw new InvalidOperationException("本番ARM中は編集できません。");}
@@ -15,8 +18,13 @@ public sealed class ShowEditor
  void Edited(object? sender,PropertyChangedEventArgs e){if(e.PropertyName is nameof(CueRow.Hours) or nameof(CueRow.Minutes) or nameof(CueRow.Seconds) or nameof(CueRow.Frames) or nameof(CueRow.Enabled))Validate();}
  public void Validate()
  {
-  try{var valid=ShowProgramService.Validate(Rows,Rate);CanArm=valid.Count>0;ValidationMessage=$"キュー {Rows.Count}件 / 有効 {valid.Count}件";}
-  catch(Exception e){CanArm=false;ValidationMessage=e.Message;}Changed?.Invoke();
+  ScheduledCue[]? next=null;
+  try{var valid=ShowProgramService.Validate(Rows,Rate);CanArm=valid.Count>0;ValidationMessage=$"キュー {Rows.Count}件 / 有効 {valid.Count}件";next=valid.OrderBy(c=>c.Start).ThenBy(c=>c.CueId).ToArray();}
+  catch(Exception e){CanArm=false;ValidationMessage=e.Message;}
+  bool changed=validatedRate!=Rate||(playbackDefinition==null)!=(next==null)||(next!=null&&playbackDefinition!=null&&!next.SequenceEqual(playbackDefinition));
+  validatedRate=Rate;playbackDefinition=next;
+  if(changed)PlaybackChanged?.Invoke();
+  Changed?.Invoke();
  }
  public void Renumber(){for(int i=0;i<Rows.Count;i++)Rows[i].DisplayOrder=i;Validate();}
  public void Delete(CueRow row){Editable();row.PropertyChanged-=Edited;Rows.Remove(row);Renumber();}

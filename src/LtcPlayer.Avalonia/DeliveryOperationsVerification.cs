@@ -39,7 +39,7 @@ public static class DeliveryOperationsVerification
    });
    await Test("button click starts without LTC / double click guarded / stream locks preview",async()=>{
     int receiving=0,index=15;await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF"),async(clock,token)=>{while(!token.IsCancellationRequested){if(Volatile.Read(ref receiving)!=0){int f=Interlocked.Increment(ref index)%200;clock.Accept(new TcFrame{Seconds=f/30,Frame=f%30,Drop=1},MasterClock.Timestamp());}await Task.Delay(33,token);}});
-    Click();Click();await Until(()=>w.Delivery==DeliveryState.Streaming&&w.LatestObservation?.Presented>2);Check(button.IsEnabled&&Equals(button.Content,"出力停止"),"stop button disabled");Check(w.FindControl<DataGrid>("CueGrid")!.IsReadOnly&&!w.FindControl<StackPanel>("PreviewControls")!.IsVisible&&w.Surface.ProgramMode,"stream controls unlocked");Check(w.LatestObservation!.State==SyncState.WAITING,"source unexpectedly active");
+    Click();Click();await Until(()=>w.Delivery==DeliveryState.Streaming&&w.LatestObservation!=null);Check(button.IsEnabled&&Equals(button.Content,"出力停止"),"stop button disabled");Check(w.FindControl<DataGrid>("CueGrid")!.IsReadOnly&&w.FindControl<StackPanel>("PreviewControls")!.IsVisible&&!w.FindControl<Slider>("Seek")!.IsEnabled&&w.Surface.ProgramMode,"stream controls unlocked");Check(w.LatestObservation!.State==SyncState.WAITING,"source unexpectedly active");
     Volatile.Write(ref receiving,1);await Until(()=>w.LatestObservation?.FramePts>0&&w.LatestObservation?.Monitor?.Presented>2);return new{State=State(),Observation=w.LatestObservation};
    });
    await Test("stop button cancel preserves output / accept returns ready / restart",async()=>{
@@ -47,9 +47,9 @@ public static class DeliveryOperationsVerification
     w.ConfirmStopForTest=_=>Task.FromResult(true);Click();await Until(()=>w.Delivery==DeliveryState.Stopped&&button.IsEnabled&&!w.Surface.ProgramMode);Check(!hint.IsVisible,"reason left after stop");Click();await Until(()=>w.LatestObservation?.Presented>2&&w.Delivery==DeliveryState.Streaming);Click();await Until(()=>w.Delivery==DeliveryState.Stopped&&button.IsEnabled);return State();
    });
    await Test("preparation failure unlocks editing and allows retry",async()=>{
-    foreach(var c in rows.Skip(1).ToArray())w.Editor.Delete(c);string missing=Path.Combine(folder,"temporarily-missing.mov");rows[0].FilePath=missing;bool rejected=false;try{await w.ArmAsync();}catch(IOException){rejected=true;}Check(rejected&&!w.IsArmed&&!w.Editor.Locked&&!w.Surface.ProgramMode,"failed preparation left locked");rows[0].FilePath=media;w.Editor.Validate();Check(button.IsEnabled,"retry stayed disabled");await w.ArmAsync();await Until(()=>w.LatestObservation?.Presented>2);await w.DisarmAsync();Check(button.IsEnabled,"retry stop disabled");return State();
+    foreach(var c in rows.Skip(1).ToArray())w.Editor.Delete(c);string missing=Path.Combine(folder,"temporarily-missing.mov");w.BeforeOutputAttachForTest=()=>throw new IOException("Synthetic output attach failure");bool rejected=false;try{await w.ArmAsync();}catch(IOException){rejected=true;}finally{w.BeforeOutputAttachForTest=null;}Check(rejected&&!w.IsArmed&&!w.Editor.Locked&&!w.Surface.ProgramMode,"failed preparation left locked");rows[0].FilePath=media;w.Editor.Validate();Check(button.IsEnabled,"retry stayed disabled");await w.ArmAsync();await Until(()=>w.LatestObservation?.Presented>2);await w.DisarmAsync();Check(button.IsEnabled,"retry stop disabled");return State();
    });
-  }finally{w.ConfirmStopForTest=null;await w.DisarmAsync();await w.Monitor.DisposeAsync();File.WriteAllText(Path.Combine(folder,"exit-code.txt"),failed?"1":"0");MainWindow.Shutdown(failed?1:0);}
+  }finally{w.ConfirmStopForTest=null;await w.DisarmAsync();await w.StopSyncPreviewAsync();await w.Coordinator.DisposeAsync();await w.Preview.DisposeAsync();await w.Monitor.DisposeAsync();File.WriteAllText(Path.Combine(folder,"exit-code.txt"),failed?"1":"0");MainWindow.Shutdown(failed?1:0);}
  }
 }
 

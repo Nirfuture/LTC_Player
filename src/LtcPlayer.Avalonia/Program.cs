@@ -32,7 +32,7 @@ public sealed class PlayerApp : Application
 {
  public override void Initialize()
  {
-  Styles.Add(new FluentTheme());
+  var theme=new FluentTheme();theme.Palettes[ThemeVariant.Dark]=new ColorPaletteResources{Accent=global::Avalonia.Media.Color.Parse("#55B2F6")};theme.Palettes[ThemeVariant.Light]=new ColorPaletteResources{Accent=global::Avalonia.Media.Color.Parse("#368DCD")};Styles.Add(theme);
   Styles.Add(new StyleInclude(new Uri("avares://LtcPlayer.Avalonia/")){Source=new Uri("avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml")});
   RequestedThemeVariant=ThemeVariant.Dark;
  }

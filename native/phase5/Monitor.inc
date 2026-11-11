@@ -5,8 +5,8 @@ extern "C" __declspec(dllexport) int __cdecl monitor_attach(void* handle,HWND ta
  auto o=(Output*)handle;if(!o||!IsWindow(target))return E_INVALIDARG;
  try {
   o->monitor.Reset();o->monitorImage.Reset();o->monitorTarget.Reset();o->monitorWindow=target;
-  RECT r;GetClientRect(target,&r);o->monitorWidth=std::max((int)r.right,1);o->monitorHeight=std::max((int)r.bottom,1);
-  ComPtr<IDXGIFactory> factory;Check(o->swap->GetParent(IID_PPV_ARGS(&factory)));
+  RECT r;GetClientRect(target,&r);o->monitorWidth=std::max(1,std::min((int)r.right,o->offscreen?o->width/2:(int)r.right));o->monitorHeight=std::max(1,std::min((int)r.bottom,o->offscreen?o->height/2:(int)r.bottom));
+  ComPtr<IDXGIDevice> dxgi;Check(o->device.As(&dxgi));ComPtr<IDXGIAdapter> adapter;Check(dxgi->GetAdapter(&adapter));ComPtr<IDXGIFactory> factory;Check(adapter->GetParent(IID_PPV_ARGS(&factory)));
   DXGI_SWAP_CHAIN_DESC sd={};sd.BufferDesc.Width=o->monitorWidth;sd.BufferDesc.Height=o->monitorHeight;sd.BufferDesc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
   sd.SampleDesc.Count=1;sd.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;sd.BufferCount=2;sd.OutputWindow=target;sd.Windowed=TRUE;sd.SwapEffect=DXGI_SWAP_EFFECT_DISCARD;
   Check(factory->CreateSwapChain(o->device.Get(),&sd,&o->monitor));Check(factory->MakeWindowAssociation(target,DXGI_MWA_NO_ALT_ENTER));
@@ -32,15 +32,19 @@ extern "C" __declspec(dllexport) int __cdecl monitor_update(void* handle,int for
   // Keep at most one pending back buffer. Retry its presentation before writing
   // another frame, including when production is holding its last image.
   if(o->monitorPresentPending){
-   HRESULT hr=o->monitor->Present(0,DXGI_PRESENT_DO_NOT_WAIT);o->monitorPresentResult=hr;o->monitorStamp=stamp.QuadPart;
+   HRESULT hr=o->monitor->Present(0,DXGI_PRESENT_DO_NOT_WAIT);o->monitorPresentResult=hr;if(!o->offscreen)o->monitorStamp=stamp.QuadPart;
    if(hr==DXGI_ERROR_WAS_STILL_DRAWING){++o->monitorRetries;return S_FALSE;}
    if(hr==DXGI_STATUS_OCCLUDED){++o->monitorOccluded;return S_FALSE;}
    Check(hr);if(hr!=S_OK)return S_FALSE;
    o->monitorPresentPending=false;++o->monitorFrames;return S_OK;
   }
-  if(!force&&stamp.QuadPart-o->monitorStamp<freq.QuadPart/120)return S_FALSE;
+  const auto period=freq.QuadPart/(o->offscreen?30:120);
+  if(!force&&stamp.QuadPart-o->monitorStamp<period)return S_FALSE;
+  // Offscreen preview cadence is measured from render admission, not delayed
+  // Present completion. Retain phase across polling jitter without catch-up bursts.
+  if(o->offscreen)o->monitorStamp=(!force&&o->monitorStamp&&stamp.QuadPart-o->monitorStamp<=period*3)?o->monitorStamp+period:stamp.QuadPart;
   RECT rect={};if(!GetClientRect(o->monitorWindow,&rect))return S_FALSE;
-  int width=std::max((int)rect.right,1),height=std::max((int)rect.bottom,1);
+  int width=std::max(1,std::min((int)rect.right,o->offscreen?o->width/2:(int)rect.right)),height=std::max(1,std::min((int)rect.bottom,o->offscreen?o->height/2:(int)rect.bottom));
   if(width!=o->monitorWidth||height!=o->monitorHeight){
    o->context->OMSetRenderTargets(0,nullptr,nullptr);o->monitorTarget.Reset();o->monitorImage.Reset();
    Check(o->monitor->ResizeBuffers(0,width,height,DXGI_FORMAT_UNKNOWN,0));
@@ -53,7 +57,10 @@ extern "C" __declspec(dllexport) int __cdecl monitor_update(void* handle,int for
   const float black[4]={0,0,0,1};o->context->ClearRenderTargetView(o->monitorTarget.Get(),black);
   float scale=std::min(o->monitorWidth/(float)o->width,o->monitorHeight/(float)o->height);
   float innerWidth=std::round(o->width*scale),innerHeight=std::round(o->height*scale);
-  D3D11_VIEWPORT vp={std::floor((o->monitorWidth-innerWidth)/2),std::floor((o->monitorHeight-innerHeight)/2),innerWidth,innerHeight,0,1};o->context->RSSetViewports(1,&vp);o->context->RSSetState(o->monitorRaster.Get());
+  // The offscreen canvas already includes the output's letterboxing. Its host
+  // has the same aspect ratio; a second fit adds a one-pixel black edge after
+  // HWND/DPI integer rounding. Map the entire canvas to the entire preview.
+  D3D11_VIEWPORT vp=o->offscreen?D3D11_VIEWPORT{0,0,(float)o->monitorWidth,(float)o->monitorHeight,0,1}:D3D11_VIEWPORT{std::floor((o->monitorWidth-innerWidth)/2),std::floor((o->monitorHeight-innerHeight)/2),innerWidth,innerHeight,0,1};o->context->RSSetViewports(1,&vp);o->context->RSSetState(o->monitorRaster.Get());
   ID3D11RenderTargetView* rt=o->monitorTarget.Get();o->context->OMSetRenderTargets(1,&rt,nullptr);o->context->IASetInputLayout(nullptr);o->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   o->context->VSSetShader(o->monitorVertex.Get(),nullptr,0);o->context->PSSetShader(o->monitorShader.Get(),nullptr,0);auto view=source.Get();o->context->PSSetShaderResources(0,1,&view);auto samp=o->monitorSampler.Get();o->context->PSSetSamplers(0,1,&samp);o->context->Draw(3,0);
   view=nullptr;o->context->PSSetShaderResources(0,1,&view);o->context->OMSetRenderTargets(0,nullptr,nullptr);
