@@ -40,6 +40,19 @@ public static class RenderingHealthVerification
     Check(w.FindControl<TextBlock>("PreviewInfo")!.Text!.Contains("プレビュー描画エラー"),"local fault notification overwritten");await w.DisarmAsync();
    });
    canvas.AttachPreview(w.Surface.ProgramWindowForVerification);
+   await Test("display topology change hides output and detaches without resetting video or audio",async()=>{
+    foreach(var mode in new[]{OutputPresentationMode.Standard,OutputPresentationMode.Compatibility}){
+     await w.ApplySettingsAsync(new(new(OutputMode:mode),display));
+     await w.Preview.LoadAsync(row.FilePath);await w.Preview.PlayAsync();await Until(()=>w.SharedAudio.State==SharedAudioState.Playing);
+     var active=w.Surface.Canvas;var session=active.SessionId;var video=w.Preview.PlaybackSessionId;var sink=w.SharedAudio.SinkSession;
+     await w.ArmAsync();long before=active.FrameId;active.SimulateDisplayChangeForTest();active.RefreshOutput();
+     Check(active.OutputDisconnected,"display change was not latched");
+     await Until(()=>!w.IsArmed);await Task.Delay(180);
+     Check(!active.OutputAttached&&w.Surface.Canvas.SessionId==session,"display change replaced canvas or left output attached");
+     Check(active.FrameId>before&&w.Preview.PlaybackSessionId==video&&w.Preview.Snapshot.State==PreviewState.Playing,"display change reset video");
+     Check(w.SharedAudio.SinkSession==sink&&w.SharedAudio.State==SharedAudioState.Playing,"display change stopped audio");
+    }
+   });
    await Test("lost shared GPU is reported and stops the affected video source and output",async()=>{
     await w.ArmAsync();var session=canvas.SessionId;const int removed=unchecked((int)0x887A0005);
     // A generic preview error with a removed-device reason must be treated as

@@ -13,6 +13,7 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
     public int Width { get; }
     public int Height { get; }
     public bool OutputAttached { get; private set; }
+    public bool OutputDisconnected { get; private set; }
     public OutputPresentationMode OutputMode { get; private set; }
     bool previewAttached;
     public int PreviewError { get; private set; }
@@ -21,6 +22,7 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
     internal Func<int,int>? PreviewResultForTest { get; set; }
     internal Func<int>? DeviceReasonForTest { get; set; }
     internal Func<int,int>? ExternalErrorForTest { get; set; }
+    internal void SimulateDisplayChangeForTest(){Access();Check(N.canvas_display_change_test(handle));}
 #endif
     public RenderSession(int width, int height)
     {
@@ -39,7 +41,7 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
         Check(N.canvas_attach(handle, ref display, mode == OutputPresentationMode.Compatibility ? 1 : 0, probe ? 1 : 0));
         int actual=N.output_presentation_mode(handle);
         if(actual!=(int)mode){N.canvas_detach(handle);throw new IOException("実際の出力方式が設定と一致しません。");}
-        OutputMode=(OutputPresentationMode)actual;OutputAttached=true;
+        OutputMode=(OutputPresentationMode)actual;OutputAttached=true;OutputDisconnected=false;
     }
     public void DetachOutput()
     {
@@ -84,9 +86,11 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
 #if VERIFICATION
         error=ExternalErrorForTest?.Invoke(error)??error;
 #endif
+        if(error==unchecked((int)0x8007048F)){OutputDisconnected=true;return;}
         if(error<0){CheckDevice(error);throw new IOException($"外部出力エラー: 0x{error:X8}");}
         int hr=N.canvas_output_refresh(handle);
         if(hr==unchecked((int)0x887A000A))return; // DXGI_ERROR_WAS_STILL_DRAWING: keep latest image.
+        if(hr==unchecked((int)0x8007048F)){OutputDisconnected=true;return;}
         Check(hr);
     }
     public ProgramMonitorStatus PreviewStatus()
@@ -116,6 +120,7 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
         [DllImport("PlayerNative.dll", CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_output_error(nint handle);
         [DllImport("PlayerNative.dll", CallingConvention=CallingConvention.Cdecl)] internal static extern int output_presentation_mode(nint handle);
         [DllImport("PlayerNative.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_device_error(nint handle);
+        [DllImport("PlayerNative.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_display_change_test(nint handle);
         const string D = "PlayerNative.dll";
         [DllImport(D, CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_create(int width,int height,out nint handle);
         [DllImport(D, CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_attach(nint handle,ref OutputDisplay display,int compatibility,int probe);

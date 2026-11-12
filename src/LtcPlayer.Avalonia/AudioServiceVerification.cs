@@ -42,6 +42,11 @@ public static class AudioServiceVerification
     Source("h264-mp3.mp4");await Wait(()=>s.Snapshot.State==SharedAudioState.NoAudio&&s.Snapshot.CueId==Read().CueId,s);Check(AudioDecodeSession.ActiveDecoders==0,"MP3 decoder");
    });
    await Test("stale source silences and explicit off releases resources",async()=>{
+    var anchor=new AudioPlayhead(Guid.NewGuid(),Guid.NewGuid(),1,"test",1,10,true,100);
+    Check(!anchor.Usable(101),"observation did not expire");
+    var owned=anchor with{SourceOwnsClock=true};
+    Check(owned.Usable(101)&&owned.Estimate(101)==2&&owned.HostSeconds==100,"owned clock contract");
+    Check(!(owned with{Advancing=false}).Usable(101),"stopped owned clock remained usable");
     Source();bool stale=false;AudioPlayhead Supplier()=>stale?Volatile.Read(ref head):Read();await using var s=new AudioOutputService(Supplier,true);await s.ConfigureAsync(true,"",.5f,false);await Wait(()=>s.Snapshot.State==SharedAudioState.Playing,s);
     stale=true;await Wait(()=>s.Snapshot.State==SharedAudioState.Waiting,s);await s.ConfigureAsync(false,"",.5f,false);Check(AudioDecodeSession.ActiveDecoders==0&&AudioOutputSink.ActiveStreams==0,"off leak");
    });

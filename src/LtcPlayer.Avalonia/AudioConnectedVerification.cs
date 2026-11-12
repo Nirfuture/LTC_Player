@@ -6,9 +6,9 @@ public static class AudioConnectedVerification
 {
  public static async Task RunAsync(MainWindow w,string folder)
  {
-  Directory.CreateDirectory(folder);bool failed=false;var results=new List<object>();int receiving=0,frames=15;
+  Directory.CreateDirectory(folder);bool failed=false;var results=new List<object>();int receiving=0,frames=15;Action? poll=null;var resumeSamples=new List<object>();
   void Check(bool ok,string message){if(!ok)throw new IOException(message);}
-  async Task Until(Func<bool> condition){double end=MasterClock.Timestamp()+6;while(!condition()){if(MasterClock.Timestamp()>end)throw new TimeoutException(JsonSerializer.Serialize(new{Audio=w.SharedAudio,Video=w.Preview.Snapshot,Sync=w.PreviewObservation}));await Task.Delay(10);}}
+  async Task Until(Func<bool> condition){double end=MasterClock.Timestamp()+6;while(!condition()){poll?.Invoke();if(MasterClock.Timestamp()>end)throw new TimeoutException(JsonSerializer.Serialize(new{Audio=w.SharedAudio,Video=w.Preview.Snapshot,Sync=w.PreviewObservation}));await Task.Delay(10);}}
   async Task Test(string name,Func<Task> body){try{await body();results.Add(new{test=name,status="PASS"});}catch(Exception e){failed=true;results.Add(new{test=name,status="FAIL",detail=e.ToString()});}File.WriteAllText(Path.Combine(folder,"results.json"),JsonSerializer.Serialize(results,new JsonSerializerOptions{WriteIndented=true}));}
   try
   {
@@ -27,6 +27,12 @@ public static class AudioConnectedVerification
     var video=w.Preview.PlaybackSessionId;double at=w.Preview.Snapshot.Position;await w.SetSharedAudioAsync(false);await Task.Delay(150);Check(w.Preview.Snapshot.Position>at+.1&&w.Preview.PlaybackSessionId==video&&AudioOutputSink.ActiveStreams==0,"audio off stopped video");
     await w.SetSharedAudioAsync(true);await Until(()=>w.SharedAudio.State==SharedAudioState.Playing);await w.Preview.PauseAsync();await Until(()=>w.SharedAudio.State==SharedAudioState.Waiting);await w.Preview.SeekAsync(.3);await w.Preview.PlayAsync();await Until(()=>w.SharedAudio.State==SharedAudioState.Playing&&w.SharedAudio.PlayedPts<1);
    });
+   await Test("manual audio survives a temporary UI reconfiguration delay",async()=>{
+    await Until(()=>w.SharedAudio.State==SharedAudioState.Playing);var before=w.SharedAudio;
+    Thread.Sleep(450);await Until(()=>w.SharedAudio.State==SharedAudioState.Playing);var after=w.SharedAudio;
+    File.WriteAllText(Path.Combine(folder,"ui-gap-observation.json"),JsonSerializer.Serialize(new{before,after},new JsonSerializerOptions{WriteIndented=true}));
+    Check(after.SinkSession==before.SinkSession&&after.Generation==before.Generation&&after.PreparationStarts==before.PreparationStarts&&after.Reseeks==before.Reseeks&&after.PlayedPts>before.PlayedPts+.3&&after.HardwarePadding>0,"UI stall interrupted or restarted continuous manual audio");
+   });
    await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF"),async(clock,token)=>{while(!token.IsCancellationRequested){if(Volatile.Read(ref receiving)!=0){int f=Interlocked.Increment(ref frames);clock.Accept(new TcFrame{Seconds=f/30,Frame=f%30,Drop=1},MasterClock.Timestamp());}await Task.Delay(33,token);}});
    await Test("LTC preempts manual and drives audio from scheduled cue time",async()=>{
     Volatile.Write(ref receiving,1);await Until(()=>w.SharedAudio.State==SharedAudioState.Playing&&w.SharedAudio.CueId==row.CueId);Check(w.Preview.Armed&&w.Preview.Snapshot.Audio==null,"manual remained active");
@@ -38,10 +44,22 @@ public static class AudioConnectedVerification
    });
    await Test("LTC loss silences and resume does not replay old audio",async()=>{
     Volatile.Write(ref receiving,0);await Until(()=>w.SharedAudio.State==SharedAudioState.Waiting&&w.PreviewObservation?.State==SyncState.LOST);Check(AudioDecodeSession.ActiveDecoders==0,"lost decoder remained");
-    int old=w.SharedAudio.Generation;Interlocked.Exchange(ref frames,35);Volatile.Write(ref receiving,1);await Until(()=>w.SharedAudio.State==SharedAudioState.Playing&&w.SharedAudio.PlayedPts>1&&w.SharedAudio.PlayedPts<2);Check(w.SharedAudio.Generation>old,"resume did not advance epoch");
+    poll=()=>{if(resumeSamples.Count<700)resumeSamples.Add(new{Host=MasterClock.Timestamp(),Audio=w.SharedAudio,Sync=w.PreviewObservation});};
+    int old=w.SharedAudio.Generation;double resumeHost=MasterClock.Timestamp();Interlocked.Exchange(ref frames,35);Volatile.Write(ref receiving,1);
+    // Recovery follows the current clock, not an absolute one-second media window
+    // that may already have elapsed while the decoder was preparing.
+    await Until(()=>w.SharedAudio is {State:SharedAudioState.Playing,ErrorSeconds:{} error} a&&a.CueId==row.CueId&&a.Generation>old&&a.Generation==w.PreviewObservation?.InputGeneration&&Math.Abs(error)<=.1);
+    Check(w.SharedAudio.Generation>old,"resume did not advance epoch");
+    File.WriteAllText(Path.Combine(folder,"resume-observation.json"),JsonSerializer.Serialize(new{RecoverySeconds=MasterClock.Timestamp()-resumeHost,Audio=w.SharedAudio,Sync=w.PreviewObservation},new JsonSerializerOptions{WriteIndented=true}));poll=null;
+   });
+   await Test("LTC audio survives video observation delay while the input clock remains valid",async()=>{
+    await Until(()=>w.SharedAudio.State==SharedAudioState.Playing);var before=w.SharedAudio;
+    Thread.Sleep(450);await Until(()=>w.SharedAudio.State==SharedAudioState.Playing);var after=w.SharedAudio;
+    File.WriteAllText(Path.Combine(folder,"ltc-ui-gap-observation.json"),JsonSerializer.Serialize(new{before,after},new JsonSerializerOptions{WriteIndented=true}));
+    Check(after.SinkSession==before.SinkSession&&after.Generation==before.Generation&&after.PreparationStarts==before.PreparationStarts&&after.Reseeks==before.Reseeks&&after.PlayedPts>before.PlayedPts+.3&&after.HardwarePadding>0,"video observation delay interrupted LTC audio");
    });
   }
   catch(Exception e){failed=true;File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());}
-  finally{Volatile.Write(ref receiving,0);await w.DisarmAsync();await w.StopSyncPreviewAsync();await w.DisposeSharedAudioAsync();await w.Preview.DisposeAsync();await w.Monitor.DisposeAsync();MainWindow.Shutdown(failed?1:0);}
+  finally{File.WriteAllText(Path.Combine(folder,"resume-trace.json"),JsonSerializer.Serialize(resumeSamples,new JsonSerializerOptions{WriteIndented=true}));Volatile.Write(ref receiving,0);await w.DisarmAsync();await w.StopSyncPreviewAsync();await w.DisposeSharedAudioAsync();await w.Preview.DisposeAsync();await w.Monitor.DisposeAsync();MainWindow.Shutdown(failed?1:0);}
  }
 }

@@ -28,7 +28,7 @@ public static class Phase5Verification
     var a=editor.Rows[0];var clone=editor.Clone(a);Assert(!clone.Enabled&&clone.CueId!=a.CueId,"disabled clone");
     var before=new CueScheduler(ShowProgramService.Validate(editor.Rows,editor.Rate));editor.Move(a,3);
     var after=new CueScheduler(ShowProgramService.Validate(editor.Rows,editor.Rate));foreach(double t in new[]{0.5,2.5,3.5,5.5})Assert(before.Select(t)?.CueId==after.Select(t)?.CueId,"reorder changed schedule");
-    var ids=editor.Rows.Select(r=>r.CueId).ToArray();string json=Path.Combine(folder,"editor-show.json");await editor.SaveAsync(json);await editor.LoadAsync(json);Assert(ids.SequenceEqual(editor.Rows.Select(r=>r.CueId)),"JSON identity/order");
+    var ids=editor.Rows.Select(r=>r.CueId).ToArray();string json=Path.Combine(folder,"editor-show.json");await editor.SaveAsync(json);int notifications=0;editor.Changed+=()=>notifications++;await editor.LoadAsync(json);Assert(notifications==1,"bulk load repeated validation notifications");Assert(ids.SequenceEqual(editor.Rows.Select(r=>r.CueId)),"JSON identity/order");
     editor.Locked=true;bool rejected=false;try{editor.Delete(editor.Rows[0]);}catch(InvalidOperationException){rejected=true;}Assert(rejected,"locked editor allows delete");
     return new{Rows=editor.Rows.Count,ReorderedWithoutScheduleChange=true,LockedMutationRejected=rejected};
    });

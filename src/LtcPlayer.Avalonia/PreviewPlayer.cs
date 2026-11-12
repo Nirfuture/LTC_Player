@@ -10,7 +10,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
     readonly PreviewHost host;
     readonly SemaphoreSlim commands=new(1);
     readonly Stopwatch clock=new();
-    readonly MediaDecoder decoder=new(reuseAnalysis:true);
+    readonly MediaDecoder decoder=new(reuseAnalysis:true,gpuScaling:true);
     CancellationTokenSource? preparation,cancel;
     Task? loop;
     long request;
@@ -66,6 +66,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
     }
     public async Task PlayAsync()
     {
+        FrameBuffer? preparedBuffer=null;
         await commands.WaitAsync();
         try
         {
@@ -89,14 +90,17 @@ public sealed class PreviewPlayer : IAsyncDisposable
                 var frame=await FirstFrameAsync(path,position,cancel.Token);cancel.Token.ThrowIfCancellationRequested();RejectArmed();
                 host.Present(frame);last=frame;presented++;
             }
+            var size=host.CanvasSize;
+            preparedBuffer=new FrameBuffer(path,size.Width,size.Height,origin,cancel.Token,decoder);
+            if(!await preparedBuffer.WaitForDataAsync(cancel.Token))throw new InvalidDataException("表示できるフレームがありません。");
             cancel.Token.ThrowIfCancellationRequested();RejectArmed();state=PreviewState.Playing;clock.Restart();
             if(audio!=null)await audio.SetPausedAsync(false,cancel.Token);
-            PlaybackSessionId=Guid.NewGuid();DecodeStarts++;loop=RunAsync(cancel.Token);Notify();
+            PlaybackSessionId=Guid.NewGuid();DecodeStarts++;var readyBuffer=preparedBuffer;preparedBuffer=null;loop=RunAsync(cancel.Token,readyBuffer);Notify();
         }
         catch(OperationCanceledException)when(armed||disposed||cancel?.IsCancellationRequested==true){await HaltAsync();state=media==null?PreviewState.Empty:PreviewState.Paused;}
         catch(InvalidOperationException)when(armed||disposed){throw;}
         catch(Exception e){errorNotice=e.Message;state=PreviewState.Error;await HaltAsync();throw;}
-        finally{Activity("");commands.Release();}
+        finally{if(preparedBuffer!=null)await preparedBuffer.DisposeAsync();Activity("");commands.Release();}
     }
     public async Task PauseAsync()
     {
@@ -155,6 +159,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
             Notify();
         }finally{commands.Release();}
     }
+    internal double PositionForAudio=>state==PreviewState.Playing?CurrentPosition():position;
     double CurrentPosition()=>media==null?position:Math.Min(media.Duration,origin+(audio?.Progress.Seconds??clock.Elapsed.TotalSeconds));
     async Task<VideoFrame> FirstFrameAsync(string file,double at,CancellationToken token)
     {
@@ -165,12 +170,11 @@ public sealed class PreviewPlayer : IAsyncDisposable
             throw new InvalidDataException("表示できるフレームがありません。");
         },token);
     }
-    async Task RunAsync(CancellationToken token)
+    async Task RunAsync(CancellationToken token,FrameBuffer preparedBuffer)
     {
-        var size=host.CanvasSize;
         try
         {
-            await using var buffer=new FrameBuffer(path,size.Width,size.Height,origin,token,decoder);
+            await using var buffer=preparedBuffer;
             VideoFrame? next=null,current=last;
             while(!token.IsCancellationRequested)
             {

@@ -15,18 +15,20 @@ public sealed class MediaDecoder
 {
     // Each decoder keeps one file version. Production retains at most two cached files per session.
     readonly bool reuseAnalysis;
+    readonly bool gpuScaling;
     readonly SemaphoreSlim analysisGate=new(1);
     internal int AnalysisRuns{get;private set;}
     internal int HapIndexBuilds{get;private set;}
     (string Path,long Length,DateTime Modified)? cachedFile;
     MediaInfo? cachedInfo;
     HapMediaDecoder.Packet[]? cachedPackets;
-    public MediaDecoder(bool reuseAnalysis=false)=>this.reuseAnalysis=reuseAnalysis;
+    public MediaDecoder(bool reuseAnalysis=false,bool gpuScaling=false){this.reuseAnalysis=reuseAnalysis;this.gpuScaling=gpuScaling;}
     static (string Path,long Length,DateTime Modified) FileVersion(string path)
     {
         var file=new FileInfo(path);
         return (file.FullName,file.Length,file.LastWriteTimeUtc);
     }
+    internal static string FfmpegTime(double seconds)=>seconds.ToString("0.#################",CultureInfo.InvariantCulture);
     internal static Process Start(string executable, IEnumerable<string> args)
     {
         var si = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
@@ -91,11 +93,22 @@ public sealed class MediaDecoder
             await foreach(var frame in HapMediaDecoder.DecodeAsync(path,info,seekSeconds,cancellation,packets))yield return frame;
             yield break;
         }
+        int textureFormat=0;
+        if(gpuScaling)
+        {
+            var info=await InspectAsync(path,cancellation);
+            // Keep the canvas aspect ratio and black bars exactly; avoid CPU upscaling
+            // only when an integral reduction fits the existing GPU BGRA path.
+            double factor=Math.Min(1,Math.Max(info.Width/(double)width,info.Height/(double)height));
+            int divisor=(int)Math.Floor(1/factor);
+            while(divisor>1&&(width%divisor!=0||height%divisor!=0||(width/divisor)%4!=0||(height/divisor)%4!=0))divisor--;
+            if(divisor>1){width/=divisor;height/=divisor;textureFormat=3;}
+        }
         var times = Channel.CreateUnbounded<double>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
         var errors = new StringBuilder();
         var filter = $"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,showinfo";
         if(!double.IsFinite(seekSeconds) || seekSeconds<0) throw new ArgumentOutOfRangeException(nameof(seekSeconds));
-        using var p = Start("ffmpeg", new[] { "-hide_banner", "-nostdin", "-loglevel", "info", "-ss", seekSeconds.ToString("R",CultureInfo.InvariantCulture), "-i", path, "-map", "0:v:0", "-an", "-sn", "-dn", "-vf", filter, "-fps_mode", "passthrough", "-pix_fmt", "bgra", "-f", "rawvideo", "pipe:1" });
+        using var p = Start("ffmpeg", new[] { "-hide_banner", "-nostdin", "-loglevel", "info", "-ss", FfmpegTime(seekSeconds), "-i", path, "-map", "0:v:0", "-an", "-sn", "-dn", "-vf", filter, "-fps_mode", "passthrough", "-pix_fmt", "bgra", "-f", "rawvideo", "pipe:1" });
         using var registration = cancellation.Register(() => Kill(p));
         var stderr = Task.Run(async () =>
         {
@@ -131,7 +144,7 @@ public sealed class MediaDecoder
                 if (at == 0) break;
                 if (at != pixels.Length) throw new InvalidDataException("復号フレームが途中で切れています。");
                 var seconds = await times.Reader.ReadAsync(frameTimeout.Token);
-                yield return new VideoFrame(pixels, seconds + seekSeconds);
+                yield return new VideoFrame(pixels, seconds + seekSeconds,textureFormat,textureFormat==0?0:width,textureFormat==0?0:height);
             }
             await p.WaitForExitAsync(cancellation); await stderr;
             if (p.ExitCode != 0) throw new InvalidDataException("FFmpeg復号失敗: " + errors);

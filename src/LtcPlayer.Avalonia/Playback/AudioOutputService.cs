@@ -3,6 +3,7 @@ namespace LtcPlayer.App;
 public enum SharedAudioState { Off,Waiting,Preparing,Playing,Muted,Resyncing,NoAudio,Error }
 public sealed record SharedAudioSnapshot(SharedAudioState State,string Notice,string DeviceId,Guid SinkSession,Guid CueId,int Generation,double TargetPts,double? PlayedPts,double? ErrorSeconds,int PreparationStarts,int Reseeks,int DroppedBlocks,int BufferedBlocks,uint HardwarePadding,float RateRatio,float AppliedGain)
 {
+    public double HostSeconds{get;init;}=MasterClock.Timestamp();
     public static SharedAudioSnapshot Off{get;}=new(SharedAudioState.Off,"","",Guid.Empty,Guid.Empty,0,0,null,null,0,0,0,0,0,1,0);
 }
 

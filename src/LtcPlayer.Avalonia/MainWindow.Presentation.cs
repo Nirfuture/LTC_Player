@@ -24,7 +24,7 @@ public partial class MainWindow
   coverTimer.Start();
  }
  async Task LoadPresentationSettingsAsync(){
-  var display=selectedDisplay;Surface.ConfigureCanvas(display?.Width??1920,display?.Height??1080);
+  var display=selectedDisplay;Surface.ConfigureCanvas(display?.Width??1920,display?.Height??1080);UpdateResponsiveLayout();
   try{cover.Image=await CoverImageLoader.LoadAsync(settings.CoverPath);}catch(Exception e){cover.Image=null;coverLoadWarning=e.Message;StatusMessage("蓋画を読み込めません。黒を使用します："+e.Message);}
   Control<NumericUpDown>("FadeSeconds").Value=(decimal)settings.FadeSeconds;
  }

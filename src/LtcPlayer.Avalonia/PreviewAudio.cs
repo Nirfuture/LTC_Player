@@ -59,7 +59,7 @@ public sealed class PreviewAudio : IAsyncDisposable
  }
  async Task Decode(string path,double seek,double duration,CancellationToken token)
  {
-  using var p=MediaDecoder.Start("ffmpeg",["-hide_banner","-v","error","-nostdin","-ss",seek.ToString("R",CultureInfo.InvariantCulture),"-i",path,"-map","0:a:0","-vn","-sn","-af","aresample=async=1:first_pts=0,apad","-t",Math.Max(.001,duration-seek).ToString("R",CultureInfo.InvariantCulture),"-ar","48000","-ac","2","-c:a","pcm_f32le","-f","f32le","pipe:1"]);
+  using var p=MediaDecoder.Start("ffmpeg",["-hide_banner","-v","error","-nostdin","-ss",MediaDecoder.FfmpegTime(seek),"-i",path,"-map","0:a:0","-vn","-sn","-af","aresample=async=1:first_pts=0,apad","-t",MediaDecoder.FfmpegTime(Math.Max(.001,duration-seek)),"-ar","48000","-ac","2","-c:a","pcm_f32le","-f","f32le","pipe:1"]);
   using var reg=token.Register(()=>MediaDecoder.Kill(p));var errors=p.StandardError.ReadToEndAsync();
   try {
    while(true){var bytes=new byte[2048*8];int at=0;

@@ -35,6 +35,10 @@ public static class AudioDecodeVerification
             await Test("seek returns source-relative PTS and bounded duration",async()=>{
                 foreach(string file in new[]{"h264-aac.mp4","hap-pcm.mov"}){var info=await AudioMediaInfo.InspectAsync(Path.Combine(fixtures,file),CancellationToken.None);await Decode(info,1.25);}
             });
+            await Test("sub-millisecond seeks decode audio and video without exponent duration syntax",async()=>{
+                string file=Path.Combine(fixtures,"h264-aac.mp4");var info=await AudioMediaInfo.InspectAsync(file,CancellationToken.None);
+                foreach(double seek in new[]{.0000752,.0000000752}){await Decode(info,seek);bool read=false;await foreach(var frame in new MediaDecoder().DecodeAsync(file,320,180,CancellationToken.None,seek)){Check(frame.Seconds>=seek-.001&&frame.Seconds<.1,"wrong tiny-seek video PTS");read=true;break;}Check(read,"no tiny-seek video frame");}
+            });
             await Test("late PCM audio preserves leading silence",async()=>{
                 var info=await AudioMediaInfo.InspectAsync(Path.Combine(offsets,"late-pcm.mov"),CancellationToken.None);var samples=await Decode(info,0);
                 Check(info.AudioStart-info.VideoStart>.3,"fixture has no offset");double first=Enumerable.Range(0,samples.Length/2).First(i=>Math.Abs(samples[i*2])>.01)/48000.0;

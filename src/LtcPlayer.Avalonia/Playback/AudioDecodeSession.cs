@@ -85,7 +85,7 @@ public sealed class AudioDecodeSession : IAsyncDisposable
     static async IAsyncEnumerable<AudioPcmBlock> DecodeAsync(AudioMediaInfo info,Guid cueId,int generation,double seek,[EnumeratorCancellation]CancellationToken token)
     {
         double absolute=info.VideoStart+seek,remaining=info.Duration-seek;
-        string F(double n)=>n.ToString("R",CultureInfo.InvariantCulture);
+        string F(double n)=>MediaDecoder.FfmpegTime(n);
         // Keep input timestamps, then express audio relative to the requested VIDEO position.
         string filter=$"asetpts=PTS-({F(absolute)})/TB,aresample=48000:async=1:first_pts=0,apad,atrim=duration={F(remaining)},asetnsamples=n=1024:p=0,aformat=sample_fmts=flt:channel_layouts=stereo,ashowinfo";
         using var local=CancellationTokenSource.CreateLinkedTokenSource(token);

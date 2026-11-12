@@ -2,6 +2,14 @@ using Avalonia.Controls;
 namespace LtcPlayer.Avalonia;
 public partial class MainWindow
 {
+ bool handlingOutputDisconnect;
+ async Task HandleOutputDisconnectedAsync()
+ {
+  if(handlingOutputDisconnect||!armed)return;
+  handlingOutputDisconnect=true;
+  try{await DisarmAsync();StatusMessage("映像出力先の接続・表示構成が変更されたため外部映像を停止しました。設定を確認して再開してください。");}
+  finally{handlingOutputDisconnect=false;}
+ }
  bool handlingGraphicsFailure;
  Guid? handledGraphicsSession;
  void UpdatePreviewNotice(string normal)

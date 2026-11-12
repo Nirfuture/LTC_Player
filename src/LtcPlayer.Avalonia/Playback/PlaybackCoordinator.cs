@@ -5,7 +5,7 @@ namespace LtcPlayer.App;
 // Lifecycle commands run on the UI dispatcher; observations and audio reads may cross threads.
 public sealed class PlaybackCoordinator : IAsyncDisposable
 {
- sealed class SyncRun(int revision){public readonly Guid Id=Guid.NewGuid();public readonly int Revision=revision;public readonly CancellationTokenSource Cancel=new();public Task? Task;public ProgramObservation? Observation;}
+ sealed class SyncRun(int revision,List<ScheduledCue> cues,double offset){public readonly CueScheduler Scheduler=new(cues);public readonly double Offset=offset;public readonly Guid Id=Guid.NewGuid();public readonly int Revision=revision;public readonly CancellationTokenSource Cancel=new();public volatile Task? Task;public ProgramObservation? Observation;}
  readonly PreviewPlayer manual;
  readonly PreviewHost surface;
  readonly Func<MasterClock> clock;
@@ -34,7 +34,10 @@ public sealed class PlaybackCoordinator : IAsyncDisposable
  void PublishManual(PreviewSnapshot p)
  {
   lock(state){if(disposed||run!=null||LtcHasPriority)return;
-   playhead=new(manual.PlaybackSessionId??manual.MediaSessionId,manual.MediaSessionId,manual.SourceGeneration,manual.LoadedPath,p.Position,p.Duration,p.State==PreviewState.Playing&&!manual.IsBusy,MasterClock.Timestamp());}
+   bool advancing=p.State==PreviewState.Playing&&!manual.IsBusy;
+   // Read the manual monotonic clock after presentation, rather than anchoring an
+   // older frame position to the end of a potentially slow UI/native operation.
+   playhead=new(manual.PlaybackSessionId??manual.MediaSessionId,manual.MediaSessionId,manual.SourceGeneration,manual.LoadedPath,advancing?manual.PositionForAudio:p.Position,p.Duration,advancing,MasterClock.Timestamp(),SourceOwnsClock:true);}
  }
  void Observe(SyncRun owner,ProgramObservation p)
  {
@@ -45,8 +48,18 @@ public sealed class PlaybackCoordinator : IAsyncDisposable
  }
  public AudioPlayhead ReadAudioPlayhead()
  {
-  AudioPlayhead p;lock(state)p=playhead;var current=clock().Read();bool priority=HasPriority(current.State);
-  if(current.State==SyncState.ERROR||(p.LtcDriven&&(!priority||current.Generation!=p.Generation))||(!p.LtcDriven&&priority))return p with{Advancing=false};
+  if(disposed)return AudioPlayhead.Empty;
+  AudioPlayhead p;SyncRun? active;lock(state){p=playhead;active=run;}
+  double now=MasterClock.Timestamp();var current=clock().Read(now);bool priority=HasPriority(current.State);
+  if(current.State==SyncState.ERROR)return p with{Advancing=false};
+  if(priority){
+   // Audio and video share the immutable program and LTC authority. A blocked
+   // presentation must not invalidate audio; current clock/cue/generation do.
+   if(active==null||active.Cancel.IsCancellationRequested||active.Task==null||active.Task.IsCompleted)return AudioPlayhead.Empty;
+   double target=current.Seconds+active.Offset;var cue=active.Scheduler.Select(target);
+   return cue==null?AudioPlayhead.Empty:new(active.Id,cue.CueId,current.Generation,cue.FilePath,target-cue.Start,cue.Duration,true,now,true);
+  }
+  if(p.LtcDriven)return p with{Advancing=false};
   return p;
  }
  public async Task ConfigureAudioAsync(bool enabled,string device,float volume,bool muted,bool silenceForVerification=false)
@@ -67,7 +80,7 @@ public sealed class PlaybackCoordinator : IAsyncDisposable
    if(run is {} old&&(old.Revision!=revision||!valid||old.Task?.IsCompleted==true))await StopCoreAsync();
    if(run!=null||!LtcHasPriority||!valid)return;
    var program=cues();if(program.Count==0)return;
-   var next=new SyncRun(revision);lock(state){run=next;playhead=AudioPlayhead.Empty;}
+   var next=new SyncRun(revision,program,offset);lock(state){run=next;playhead=AudioPlayhead.Empty;}
    try{await manual.SetArmedAsync(true);next.Task=RunAsync(next,program,display,offset);}
    catch{await StopCoreAsync();throw;}
   }finally{commands.Release();}
@@ -75,7 +88,7 @@ public sealed class PlaybackCoordinator : IAsyncDisposable
  async Task RunAsync(SyncRun owner,List<ScheduledCue> cues,OutputDisplay display,double offset)
  {
   var token=owner.Cancel.Token;
-  try{await Task.Run(()=>new ProgramPlayback(new UiDispatcher()).RunAsync(cues,display,clock(),offset,p=>Observe(owner,p),token,presentation:new PreviewProgramPresentation(surface),cover:cover,analysisCache:analyses));}
+  try{await Task.Run(()=>new ProgramPlayback(new UiDispatcher()).RunAsync(cues,display,clock(),offset,p=>Observe(owner,p),token,presentation:new PreviewProgramPresentation(surface),cover:cover,analysisCache:analyses,timeline:owner.Scheduler));}
   catch(OperationCanceledException)when(token.IsCancellationRequested){}
   catch(Exception e){DeferRetry();lock(state){if(ReferenceEquals(run,owner))playhead=AudioPlayhead.Empty;}Failed?.Invoke(e);}
  }

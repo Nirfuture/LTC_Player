@@ -45,10 +45,10 @@ public sealed class ProgramPlayback
         }
         public ValueTask DisposeAsync()=>buffer.DisposeAsync();
     }
-    public async Task RunAsync(IReadOnlyList<ScheduledCue> cues,OutputDisplay display,MasterClock clock,double offset,Action<ProgramObservation> observe,CancellationToken token,bool verify=false,nint monitorWindow=0,Action? stopRequested=null,Action<int>? monitorError=null,OutputPresentationMode outputMode=OutputPresentationMode.Standard,ManualOutputControl? manualControl=null,IProgramPresentation? presentation=null,CoverController? cover=null,Dictionary<string,MediaDecoder>? analysisCache=null)
+    public async Task RunAsync(IReadOnlyList<ScheduledCue> cues,OutputDisplay display,MasterClock clock,double offset,Action<ProgramObservation> observe,CancellationToken token,bool verify=false,nint monitorWindow=0,Action? stopRequested=null,Action<int>? monitorError=null,OutputPresentationMode outputMode=OutputPresentationMode.Standard,ManualOutputControl? manualControl=null,IProgramPresentation? presentation=null,CoverController? cover=null,Dictionary<string,MediaDecoder>? analysisCache=null,CueScheduler? timeline=null)
     {
         OutputPresentation.Validate(outputMode);
-        var scheduler=new CueScheduler(cues);VideoRenderer? renderer=null;CueFrames? active=null,preload=null,recovery=null;bool monitorFaultNotified=false;
+        var scheduler=timeline??new CueScheduler(cues);VideoRenderer? renderer=null;CueFrames? active=null,preload=null,recovery=null;bool monitorFaultNotified=false;
         var black=new byte[checked(display.Width*display.Height*4)];int epoch=-1,presented=0,skipped=0,repeated=0,seeks=0;
         double? lastPts=null;Guid? lastId=null,displayedId=null;double? displayedPts=null;uint verificationPixel=0;
         ProgramMonitorStatus? monitorStatus=null;double nextMonitorSample=0;
@@ -64,9 +64,9 @@ public sealed class ProgramPlayback
                 var pinned=new[]{active?.Cue.FilePath,preload?.Cue.FilePath,recovery?.Cue.FilePath}.Where(p=>p!=null).Select(p=>Path.GetFullPath(p!)).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var unused=analyses.Keys.FirstOrDefault(p=>!pinned.Contains(p));
                 if(unused!=null)analyses.Remove(unused);
-                else return new MediaDecoder(reuseAnalysis:true);
+                else return new MediaDecoder(reuseAnalysis:true,gpuScaling:true);
             }
-            decoder=new MediaDecoder(reuseAnalysis:true);analyses.Add(key,decoder);return decoder;
+            decoder=new MediaDecoder(reuseAnalysis:true,gpuScaling:true);analyses.Add(key,decoder);return decoder;
         }
         try
         {
