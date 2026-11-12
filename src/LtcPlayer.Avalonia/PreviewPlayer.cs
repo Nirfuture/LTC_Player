@@ -87,17 +87,15 @@ public sealed class PreviewPlayer : IAsyncDisposable
             {
                 audio=new(path,position,media.Duration,muted?0:volume);await audio.ReadyAsync(cancel.Token);
             }
-            // Only an explicit restart/seek needs another still decode.
-            if(last==null||Math.Abs(last.Seconds-position)>1/media.FrameRate)
-            {
-                var frame=await FirstFrameAsync(path,position,cancel.Token);cancel.Token.ThrowIfCancellationRequested();RejectArmed();
-                host.Present(frame);StartupMeasurementTrace.Once("video_first_present",frame.Seconds,"restart still; API returned");last=frame;presented++;
-            }
             var size=host.CanvasSize;
             StartupMeasurementTrace.Mark("video_stream_prepare_begin");
             preparedBuffer=new FrameBuffer(path,size.Width,size.Height,origin,cancel.Token,decoder);
             if(!await preparedBuffer.WaitForDataAsync(cancel.Token))throw new InvalidDataException("表示できるフレームがありません。");
             StartupMeasurementTrace.Mark("video_stream_first_frame_ready");
+            cancel.Token.ThrowIfCancellationRequested();RejectArmed();
+            // Present the playback buffer's first frame, then keep consuming that buffer.
+            if(!preparedBuffer.TryRead(out var first)||first==null)throw new InvalidDataException("表示できるフレームがありません。");
+            host.Present(first);StartupMeasurementTrace.Once("video_first_present",first.Seconds,"playback buffer first frame; API returned");last=first;presented++;
             cancel.Token.ThrowIfCancellationRequested();RejectArmed();state=PreviewState.Playing;clock.Restart();
             StartupMeasurementTrace.Mark("video_clock_start");
             if(audio!=null)await audio.SetPausedAsync(false,cancel.Token);
