@@ -89,7 +89,9 @@ public sealed class AudioDecodeSession : IAsyncDisposable
         // Keep input timestamps, then express audio relative to the requested VIDEO position.
         string filter=$"asetpts=PTS-({F(absolute)})/TB,aresample=48000:async=1:first_pts=0,apad,atrim=duration={F(remaining)},asetnsamples=n=1024:p=0,aformat=sample_fmts=flt:channel_layouts=stereo,ashowinfo";
         using var local=CancellationTokenSource.CreateLinkedTokenSource(token);
+        StartupMeasurementTrace.Mark("audio_ffmpeg_start_request",seek);
         using var p=MediaDecoder.Start("ffmpeg",["-hide_banner","-nostdin","-loglevel","info","-copyts","-ss",F(Math.Max(0,absolute-info.ContainerStart)),"-i",info.Path,"-map","0:a:0","-vn","-sn","-dn","-af",filter,"-c:a","pcm_f32le","-f","f32le","pipe:1"]);
+        StartupMeasurementTrace.Mark("audio_ffmpeg_process_created");
         int now=Interlocked.Increment(ref active);int prior;
         do{prior=Volatile.Read(ref peak);if(now<=prior)break;}while(Interlocked.CompareExchange(ref peak,now,prior)!=prior);
         using var registration=local.Token.Register(()=>MediaDecoder.Kill(p));
@@ -122,6 +124,7 @@ public sealed class AudioDecodeSession : IAsyncDisposable
                 if(!stamps.Reader.TryRead(out var stamp))continue;
                 if(Math.Abs(stamp.Pts-expected)>1)throw new InvalidDataException("音声PTSが不連続です。");
                 var bytes=new byte[checked(stamp.Frames*8)];await p.StandardOutput.BaseStream.ReadExactlyAsync(bytes,frameTimeout.Token);
+                StartupMeasurementTrace.Once("audio_first_pcm",seek+stamp.Pts/48000.0);
                 var samples=new float[stamp.Frames*2];Buffer.BlockCopy(bytes,0,samples,0,bytes.Length);
                 yield return new(cueId,generation,seek+stamp.Pts/48000.0,samples);expected=stamp.Pts+stamp.Frames;
             }

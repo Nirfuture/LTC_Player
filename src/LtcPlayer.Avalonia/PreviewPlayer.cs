@@ -45,6 +45,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
     public void SetVolume(double value,bool mute){volume=(float)Math.Clamp(value,0,1);muted=mute;if(audio!=null)audio.Gain=muted?0:volume;}
     public async Task LoadAsync(string file)
     {
+        StartupMeasurementTrace.Mark("video_load_begin");
         RejectArmed();CancelPreparation();long version=request;
         using var operation=new CancellationTokenSource();preparation=operation;bool entered=false;
         try
@@ -55,10 +56,11 @@ public sealed class PreviewPlayer : IAsyncDisposable
             var video=decoder.InspectAsync(file,operation.Token);
             var sound=PreviewAudio.InspectAsync(file,operation.Token);
             await Task.WhenAll(video,sound);
+            StartupMeasurementTrace.Mark("selection_probes_complete");
             var frame=await FirstFrameAsync(file,0,operation.Token);
             operation.Token.ThrowIfCancellationRequested();RejectArmed();if(version!=request)return;
             MediaSessionId=Guid.NewGuid();SourceGeneration++;media=await video;audioInfo=await sound;path=file;position=origin=0;errorNotice="";state=PreviewState.Ready;
-            host.Present(frame);last=frame;presented++;Notify();
+            host.Present(frame);StartupMeasurementTrace.Once("video_first_present",frame.Seconds,"selection still; API returned");last=frame;presented++;Notify();
         }
         catch(OperationCanceledException)when(operation.IsCancellationRequested){}
         catch(Exception e){if(version==request){errorNotice=e.Message;Notify();}throw;}
@@ -66,6 +68,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
     }
     public async Task PlayAsync()
     {
+        StartupMeasurementTrace.Mark("video_play_prepare_begin");
         FrameBuffer? preparedBuffer=null;
         await commands.WaitAsync();
         try
@@ -88,12 +91,15 @@ public sealed class PreviewPlayer : IAsyncDisposable
             if(last==null||Math.Abs(last.Seconds-position)>1/media.FrameRate)
             {
                 var frame=await FirstFrameAsync(path,position,cancel.Token);cancel.Token.ThrowIfCancellationRequested();RejectArmed();
-                host.Present(frame);last=frame;presented++;
+                host.Present(frame);StartupMeasurementTrace.Once("video_first_present",frame.Seconds,"restart still; API returned");last=frame;presented++;
             }
             var size=host.CanvasSize;
+            StartupMeasurementTrace.Mark("video_stream_prepare_begin");
             preparedBuffer=new FrameBuffer(path,size.Width,size.Height,origin,cancel.Token,decoder);
             if(!await preparedBuffer.WaitForDataAsync(cancel.Token))throw new InvalidDataException("表示できるフレームがありません。");
+            StartupMeasurementTrace.Mark("video_stream_first_frame_ready");
             cancel.Token.ThrowIfCancellationRequested();RejectArmed();state=PreviewState.Playing;clock.Restart();
+            StartupMeasurementTrace.Mark("video_clock_start");
             if(audio!=null)await audio.SetPausedAsync(false,cancel.Token);
             PlaybackSessionId=Guid.NewGuid();DecodeStarts++;var readyBuffer=preparedBuffer;preparedBuffer=null;loop=RunAsync(cancel.Token,readyBuffer);Notify();
         }
@@ -166,7 +172,8 @@ public sealed class PreviewPlayer : IAsyncDisposable
         var size=host.CanvasSize;
         return await Task.Run(async()=>
         {
-            await foreach(var frame in decoder.DecodeAsync(file,size.Width,size.Height,token,at))return frame;
+            StartupMeasurementTrace.Mark("video_still_decode_begin");
+            await foreach(var frame in decoder.DecodeAsync(file,size.Width,size.Height,token,at)){StartupMeasurementTrace.Mark("video_still_first_frame_ready",frame.Seconds);return frame;}
             throw new InvalidDataException("表示できるフレームがありません。");
         },token);
     }
@@ -184,7 +191,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
                     position=CurrentPosition();
                     if(next==null)buffer.TryRead(out next);
                     while(next!=null&&next.Seconds<=position+.000001){current=next;next=null;buffer.TryRead(out next);}
-                    if(current!=null&&!ReferenceEquals(current,last)){host.Present(current);last=current;presented++;}
+                    if(current!=null&&!ReferenceEquals(current,last)){host.Present(current);StartupMeasurementTrace.Once("video_playback_first_present",current.Seconds,"API returned");last=current;presented++;}
                     if(position>=media!.Duration){state=PreviewState.Ended;clock.Stop();if(audio!=null){await audio.DisposeAsync();audio=null;}Notify();return;}
                     Notify();
                 }

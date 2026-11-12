@@ -94,7 +94,7 @@ public sealed class AudioOutputService : IAsyncDisposable
                     if(config.Version!=applied)
                     {
                         Close();applied=config.Version;faulted=-1;policy=new();
-                        if(config.Enabled){sink=new(config.DeviceId);sinkSession=Guid.NewGuid();sink.SetStreamGain(hardwareSilence?0:config.Muted?0:config.Volume);}
+                        if(config.Enabled){StartupMeasurementTrace.Mark("audio_device_init_begin");sink=new(config.DeviceId);sinkSession=Guid.NewGuid();sink.SetStreamGain(hardwareSilence?0:config.Muted?0:config.Volume);StartupMeasurementTrace.Mark("audio_device_init_complete");}
                         Publish(config.Enabled?SharedAudioState.Waiting:SharedAudioState.Off,"");config.Applied.TrySetResult();
                     }
                     if(!config.Enabled||faulted==config.Version){stop.Token.WaitHandle.WaitOne(3);continue;}
@@ -109,15 +109,17 @@ public sealed class AudioOutputService : IAsyncDisposable
                     {
                         ResetSource();identity=key;policy=new();
                         var file=new FileInfo(source.Path);var fileKey=(file.FullName,file.Length,file.LastWriteTimeUtc);
+                        StartupMeasurementTrace.Mark("audio_analysis_begin",note:cache.ContainsKey(fileKey)?"cache hit":"cache miss");
                         if(cache.TryGetValue(fileKey,out info))inspection=Task.FromResult(info);
                         else{inspectionCancel=CancellationTokenSource.CreateLinkedTokenSource(stop.Token);inspection=AudioMediaInfo.InspectAsync(source.Path,inspectionCancel.Token);}
                     }
                     if(info==null)
                     {
                         if(!inspection!.IsCompleted){Publish(SharedAudioState.Preparing,"音声を解析中",source);stop.Token.WaitHandle.WaitOne(3);continue;}
-                        info=inspection.GetAwaiter().GetResult();CancelInspection();
+                        info=inspection.GetAwaiter().GetResult();StartupMeasurementTrace.Mark("audio_analysis_complete",note:"worker observed completion");CancelInspection();
                         var file=new FileInfo(source.Path);if(cache.Count>=2)cache.Remove(cache.Keys.First());cache[(file.FullName,file.Length,file.LastWriteTimeUtc)]=info;
                     }
+                    StartupMeasurementTrace.Once("audio_analysis_available",note:"cached results bypass completion branch");
                     if(!info.Supported){Publish(SharedAudioState.NoAudio,info.Notice,source);stop.Token.WaitHandle.WaitOne(4);continue;}
                     if(decode==null)BeginDecode(source,target);
                     if(decode==null){Publish(SharedAudioState.Waiting,"音声終端",source);stop.Token.WaitHandle.WaitOne(3);continue;}
@@ -153,7 +155,9 @@ public sealed class AudioOutputService : IAsyncDisposable
                     now=MasterClock.Timestamp();target=source.Estimate(now);
                     if(!running&&stats.Padding>0&&target>=origin)
                     {
+                        StartupMeasurementTrace.Mark("audio_start_request",origin+stats.ConsumedSeconds);
                         sink.SetRunning(true);running=true;
+                        StartupMeasurementTrace.Mark("audio_start_complete",origin+stats.ConsumedSeconds,"WASAPI Start returned");
                         lead=Math.Clamp((MasterClock.Timestamp()-prepareAt)+.025,.1,.5);
                     }
                     if(running)

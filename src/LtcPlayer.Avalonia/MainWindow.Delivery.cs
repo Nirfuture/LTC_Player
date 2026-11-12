@@ -31,6 +31,7 @@ public partial class MainWindow
  internal void PlayManual(CueRow row){if(CanManualOutput&&row.Enabled)_ = Safe(()=>PlayManualAsync(row,true));}
  internal void StopManual(){if(CanManualOutput)_ = Safe(()=>Preview.StopAsync());}
  async Task PlayManualAsync(CueRow row,bool restart){
+  StartupMeasurementTrace.Mark("play_request");
   if(closing||busy||!playback.ManualAvailable||Surface.Canvas.SharedDeviceError<0)return;
   if(armed&&(!CanManualOutput||!row.Enabled))return;
   await StopSyncPreviewAsync();if(!playback.ManualAvailable)return;
