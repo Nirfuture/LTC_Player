@@ -32,3 +32,21 @@ Validation: verification build succeeded; preview-performance passed (6 measurem
 Restart trials contain no video_still_decode_begin event. Request to WASAPI Start was 106/108ms (previous local baseline 184/188ms). First attempt was 283ms versus prior 290ms; initial selection still decoding remains. These are small samples, not guaranteed latency bounds. Company-PC improvement remains unmeasured.
 
 Measurement caveat: video_first_present records the buffer's first frame before clock start on restarts. video_playback_first_present is emitted by RunAsync on a later changed frame, so after this change it is not the first presentation from the playback buffer. Do not compare that marker alone as equivalent first-frame latency across versions. Raw transitions preserve both markers and video_clock_start.
+
+## Parallel manual audio preparation (2026-11-13, uncommitted)
+
+PreviewPlayer publishes a preparation request with the playback session identity and cancellation token when PlayAsync starts preparing its stream. PlaybackCoordinator forwards it without advancing the clock. AudioOutputService may inspect/decode this source, but cannot begin a WASAPI epoch or write PCM until the advancing playhead for the same session authorizes playback. The existing bounded PCM queue limits predecoded data. Cancelled requests and replacement identities invalidate preparation. The preparation permission remains present through the final busy-state transition to avoid resetting the decoder between preparing and playing.
+
+Scope: manual stream preparation only. Initial LoadAsync selection analysis/still preparation is not overlapped, audio metadata is not shared across analyzers, and no LTC lookahead is added. Paused playback retains its existing resume path.
+
+Final verification build succeeded. audio-service 8/8 (extended existing cases verify prepared PCM does not enter the hardware queue, same decoder is used after permission, cancellation releases decoder), audio-connected 8/8, playback-integration 13/13 with the supplied H.264 material. Startup harness: 3/3, preparation counters 1/2/3, reseeks 0/0/0. No full suite, endurance or physical AV timing tests.
+
+| Trial | Request to video clock ms | Request to WASAPI Start ms | Audio start after video clock ms |
+|---|---:|---:|---:|
+| First | 201.2 | 219.1 | 17.9 |
+| Restart 1 | 69.3 | 72.9 | 3.6 |
+| Restart 2 | 72.1 | 73.5 | 1.4 |
+
+Restart PCM was available about 39ms before video clock start. First-trial PCM arrived about 4.5ms after clock start. Internal errors after start: +2.50/+1.67/+3.97ms. These three samples are not guaranteed latency bounds. Company-PC effect is not measured yet. Existing local FFmpeg 6.0/Realtek/1920x1080 conditions still differ from the company machine.
+
+An intermediate measurement exposed a redundant decoder restart during the busy-to-playing transition; this was fixed before the final tests above. Intermediate samples are not combined with final results. Final raw logs remain outside Git under work/startup-comparison/audio-preparation-final.

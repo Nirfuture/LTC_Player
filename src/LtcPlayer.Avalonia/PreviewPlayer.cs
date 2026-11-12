@@ -14,7 +14,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
     CancellationTokenSource? preparation,cancel;
     Task? loop;
     long request;
-    bool disposed,armed,audioSuppressed,sharedAudio;
+    bool disposed,armed,audioSuppressed,sharedAudio,preparingPlayback;
     MediaInfo? media;
     PreviewAudioInfo? audioInfo;
     PreviewAudio? audio;
@@ -32,6 +32,8 @@ public sealed class PreviewPlayer : IAsyncDisposable
     public Guid MediaSessionId{get;private set;}
     public int SourceGeneration{get;private set;}
     public int DecodeStarts{get;private set;}
+    internal bool PreparingPlayback=>preparingPlayback&&cancel is {IsCancellationRequested:false};
+    internal CancellationToken PreparationCancellation=>cancel?.Token??new CancellationToken(true);
     public bool Armed=>armed;
     public string LoadedPath=>path;
     public double FrameRate=>media?.FrameRate??0;
@@ -83,6 +85,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
             bool restart=state is PreviewState.Stopped or PreviewState.Ended;
             Activity("再生を準備中…");await HaltAsync();if(restart||position>=media.Duration-.001)position=0;
             errorNotice="";cancel=new();origin=position;
+            PlaybackSessionId=Guid.NewGuid();preparingPlayback=true;Notify();
             if(audioInfo!.Supported&&!audioSuppressed)
             {
                 audio=new(path,position,media.Duration,muted?0:volume);await audio.ReadyAsync(cancel.Token);
@@ -99,12 +102,12 @@ public sealed class PreviewPlayer : IAsyncDisposable
             cancel.Token.ThrowIfCancellationRequested();RejectArmed();state=PreviewState.Playing;clock.Restart();
             StartupMeasurementTrace.Mark("video_clock_start");
             if(audio!=null)await audio.SetPausedAsync(false,cancel.Token);
-            PlaybackSessionId=Guid.NewGuid();DecodeStarts++;var readyBuffer=preparedBuffer;preparedBuffer=null;loop=RunAsync(cancel.Token,readyBuffer);Notify();
+            DecodeStarts++;var readyBuffer=preparedBuffer;preparedBuffer=null;loop=RunAsync(cancel.Token,readyBuffer);Notify();
         }
         catch(OperationCanceledException)when(armed||disposed||cancel?.IsCancellationRequested==true){await HaltAsync();state=media==null?PreviewState.Empty:PreviewState.Paused;}
         catch(InvalidOperationException)when(armed||disposed){throw;}
         catch(Exception e){errorNotice=e.Message;state=PreviewState.Error;await HaltAsync();throw;}
-        finally{if(preparedBuffer!=null)await preparedBuffer.DisposeAsync();Activity("");commands.Release();}
+        finally{preparingPlayback=false;if(preparedBuffer!=null)await preparedBuffer.DisposeAsync();Activity("");commands.Release();}
     }
     public async Task PauseAsync()
     {

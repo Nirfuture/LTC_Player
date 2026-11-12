@@ -37,7 +37,7 @@ public sealed class PlaybackCoordinator : IAsyncDisposable
    bool advancing=p.State==PreviewState.Playing&&!manual.IsBusy;
    // Read the manual monotonic clock after presentation, rather than anchoring an
    // older frame position to the end of a potentially slow UI/native operation.
-   playhead=new(manual.PlaybackSessionId??manual.MediaSessionId,manual.MediaSessionId,manual.SourceGeneration,manual.LoadedPath,advancing?manual.PositionForAudio:p.Position,p.Duration,advancing,MasterClock.Timestamp(),SourceOwnsClock:true);}
+   playhead=new(manual.PlaybackSessionId??manual.MediaSessionId,manual.MediaSessionId,manual.SourceGeneration,manual.LoadedPath,advancing?manual.PositionForAudio:p.Position,p.Duration,advancing,MasterClock.Timestamp(),SourceOwnsClock:true){PreparationRequested=manual.PreparingPlayback,PreparationCancellation=manual.PreparationCancellation};}
  }
  void Observe(SyncRun owner,ProgramObservation p)
  {

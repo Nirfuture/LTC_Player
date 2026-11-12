@@ -100,7 +100,7 @@ public sealed class AudioOutputService : IAsyncDisposable
                     if(!config.Enabled||faulted==config.Version){stop.Token.WaitHandle.WaitOne(3);continue;}
                     var source=readPlayhead();double now=MasterClock.Timestamp(),target=source.Estimate(now);
                     sink!.SetStreamGain(hardwareSilence?0:config.Muted?0:config.Volume);
-                    if(!source.Usable(now)||target>=source.Duration)
+                    if(!source.CanPrepare(now)||target>=source.Duration)
                     {
                         ResetSource();Publish(SharedAudioState.Waiting,source.Notice,source);stop.Token.WaitHandle.WaitOne(3);continue;
                     }
@@ -127,8 +127,10 @@ public sealed class AudioOutputService : IAsyncDisposable
                     decode.Ready.GetAwaiter().GetResult();
                     // Recheck the supplier before any staged samples reach WASAPI.
                     var latest=readPlayhead();now=MasterClock.Timestamp();target=latest.Estimate(now);
-                    if(!latest.Usable(now)||(latest.SessionId,latest.CueId,latest.Generation,latest.Path)!=key){ResetSource();continue;}
+                    if(!latest.CanPrepare(now)||(latest.SessionId,latest.CueId,latest.Generation,latest.Path)!=key){ResetSource();continue;}
                     source=latest;
+                    // Prepared PCM stays in the bounded decode queue until the clock advances.
+                    if(!source.Usable(now)){Publish(SharedAudioState.Preparing,"再生開始を待機中",source);stop.Token.WaitHandle.WaitOne(3);continue;}
                     if(!epochStarted)
                     {
                         int budget=16;
