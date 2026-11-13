@@ -71,7 +71,7 @@ public partial class MainWindow
   if(!presentationReady||closing||closePending||busy||!Surface.Ready||Surface.Canvas.SharedDeviceError<0||MasterClock.Timestamp()<playback.RetryAt)return;
   try{
    var size=Surface.CanvasSize;
-   await playback.ReconcileAsync(programRevision,Editor.CanArm,()=>ShowProgramService.Validate(Editor.Rows,Editor.Rate),new OutputDisplay{Width=size.Width,Height=size.Height},settings.Offset/Editor.Rate.Fps);
+   await playback.ReconcileAsync(programRevision,Editor.CanArm,()=>ShowProgramService.Validate(Editor.Rows,Editor.Rate),new OutputDisplay{Width=size.Width,Height=size.Height},Editor.Rate.FramesToSeconds(settings.Offset));
    UpdateEnabled();
   }catch(Exception e){playback.DeferRetry();StatusMessage("同期プレビュー："+e.Message);await StopSyncPreviewAsync();}
  }

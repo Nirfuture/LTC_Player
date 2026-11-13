@@ -74,7 +74,7 @@
 - `artifacts/audio-v06/foundation/devices.json`: このPCの出力先。機器IDを含むため共有時は内容を確認する。
 - `artifacts/audio-v06/regression/phase5`: 初回の失敗記録。
 - `artifacts/audio-v06/regression-fixed`: 修正後の既存回帰。
-- 検証用ビルド後に`./scripts/verify-audio-foundation.ps1`で新音声基盤を再実行できる。
+- 検証用ビルド後に`./scripts/legacy/verify-audio-foundation.ps1`で新音声基盤を再実行できる。
 
 ランタイム同梱EXEと同スクリプトでも12項目すべて通過した。結果は`artifacts/audio-v06/packaged-foundation`へ保存。
 

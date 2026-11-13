@@ -54,7 +54,7 @@ Black呼出し、シーク、リサイズ、遮蔽復帰の追加切分けは後
 リポジトリ指定SDK10.0.403による配布用ビルドの再現確認とは別。
 
 結果: artifacts/redesign/baseline、shared-canvas、responsive、legacy-monitor。
-scripts/verify-redesign.ps1に検証版の再実行手順を追加。--settingsで試験用ファイルを指定する。
+scripts/legacy/verify-redesign.ps1に検証版の再実行手順を追加。--settingsで試験用ファイルを指定する。
 
 ## 未完了
 

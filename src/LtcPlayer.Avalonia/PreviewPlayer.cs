@@ -45,7 +45,10 @@ public sealed class PreviewPlayer : IAsyncDisposable
     void RejectArmed(){ObjectDisposedException.ThrowIf(disposed,this);if(armed)throw new InvalidOperationException("LTC同期中は手動再生を変更できません。");}
     public void CancelPreparation(){request++;preparation?.Cancel();if(IsBusy)cancel?.Cancel();}
     public void SetVolume(double value,bool mute){volume=(float)Math.Clamp(value,0,1);muted=mute;if(audio!=null)audio.Gain=muted?0:volume;}
-    public async Task LoadAsync(string file)
+#if VERIFICATION
+    internal Func<CancellationToken,Task>? LoadBeforeFrameForTest{get;set;}
+#endif
+    public async Task<bool> LoadAsync(string file)
     {
         StartupMeasurementTrace.Mark("video_load_begin");
         RejectArmed();CancelPreparation();long version=request;
@@ -59,12 +62,15 @@ public sealed class PreviewPlayer : IAsyncDisposable
             var sound=PreviewAudio.InspectAsync(file,operation.Token);
             await Task.WhenAll(video,sound);
             StartupMeasurementTrace.Mark("selection_probes_complete");
+#if VERIFICATION
+            if(LoadBeforeFrameForTest is {} beforeFrame)await beforeFrame(operation.Token);
+#endif
             var frame=await FirstFrameAsync(file,0,operation.Token);
-            operation.Token.ThrowIfCancellationRequested();RejectArmed();if(version!=request)return;
+            operation.Token.ThrowIfCancellationRequested();RejectArmed();if(version!=request)return false;
             MediaSessionId=Guid.NewGuid();SourceGeneration++;media=await video;audioInfo=await sound;path=file;position=origin=0;errorNotice="";state=PreviewState.Ready;
-            host.Present(frame);StartupMeasurementTrace.Once("video_first_present",frame.Seconds,"selection still; API returned");last=frame;presented++;Notify();
+            host.Present(frame);StartupMeasurementTrace.Once("video_first_present",frame.Seconds,"selection still; API returned");last=frame;presented++;Notify();return true;
         }
-        catch(OperationCanceledException)when(operation.IsCancellationRequested){}
+        catch(OperationCanceledException)when(operation.IsCancellationRequested){return false;}
         catch(Exception e){if(version==request){errorNotice=e.Message;Notify();}throw;}
         finally{if(ReferenceEquals(preparation,operation)){preparation=null;Activity("");}if(entered)commands.Release();}
     }

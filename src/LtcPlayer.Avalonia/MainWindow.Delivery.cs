@@ -38,7 +38,7 @@ public partial class MainWindow
   bool same=previewCue==row.CueId&&string.Equals(Preview.LoadedPath,row.FilePath,StringComparison.OrdinalIgnoreCase);
   previewSelection=row;rebinding=true;try{Grid.SelectedItem=row;}finally{rebinding=false;}
   if(!playback.UsesSharedAudio&&!armed)Preview.AllowAudioForNextPlay();
-  if(restart||!same){previewCue=row.CueId;CancelScrub();await Preview.LoadAsync(row.FilePath);}
+  if(restart||!same){previewCue=row.CueId;CancelScrub();if(!await Preview.LoadAsync(row.FilePath))return;}
   if(LtcHasPriority||Preview.Armed){await UpdateAutoPreviewAsync();return;}
   if(!restart&&same&&Preview.Snapshot.State==PreviewState.Playing)await Preview.PauseAsync();else await Preview.PlayAsync();
   UpdateRowControls();

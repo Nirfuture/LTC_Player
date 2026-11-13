@@ -31,13 +31,19 @@ public static class PreviewClipVerification
    await Test("resizing and scrolling retain playback and output geometry",async()=>{double before=w.Preview.Snapshot.Position;foreach(var size in new[]{(1640,500),(800,600),(1640,940)}){w.Width=size.Item1;w.Height=size.Item2;await Settle();CheckClip();}Check(host.Canvas.SessionId==session&&w.Preview.Snapshot.State==PreviewState.Playing&&w.Preview.Snapshot.Position>before,"clipping interrupted playback");});
    await Test("portrait selection sizes the viewport before window resize",async()=>{
     w.Width=1640;w.Height=940;await Settle();
-    var landscape=VideoRenderer.Displays().First(d=>d.Primary!=0);var portrait=VideoRenderer.Displays().First(d=>d.Height>d.Width);
-    var settings=InputSettings.Load(Program.Option("--settings"));
-    await w.ApplySettingsAsync(new(settings,landscape));await Settle();
-    await w.ApplySettingsAsync(new(settings,portrait));await Settle();
-    var viewport=w.FindControl<Grid>("PreviewViewport")!;var pane=w.FindControl<Grid>("PreviewPane")!;
-    double expected=Math.Clamp(Math.Max(200,pane.Bounds.Width-26)*portrait.Height/portrait.Width,160,420);
-    Check(Math.Abs(viewport.Bounds.Height-expected)<1,"portrait height remained stale: "+viewport.Bounds.Height+" expected "+expected);
+    var displays=VideoRenderer.Displays();var landscape=displays.First(d=>d.Primary!=0);var portrait=displays.FirstOrDefault(d=>d.Height>d.Width);
+    bool synthetic=portrait.Width==0;
+    if(synthetic){portrait=new OutputDisplay{Name="SYNTHETIC-LAYOUT-PORTRAIT",Width=1080,Height=1920};w.SettingsDisplaysForTest=()=>[..displays,portrait];}
+    // This case checks canvas/layout only; no physical external output is attached.
+    try{
+     var settings=InputSettings.Load(Program.Option("--settings"));
+     await w.ApplySettingsAsync(new(settings,landscape));await Settle();
+     await w.ApplySettingsAsync(new(settings,portrait));await Settle();
+     var viewport=w.FindControl<Grid>("PreviewViewport")!;var pane=w.FindControl<Grid>("PreviewPane")!;
+     double expected=Math.Clamp(Math.Max(200,pane.Bounds.Width-26)*portrait.Height/portrait.Width,160,420);
+     Check(Math.Abs(viewport.Bounds.Height-expected)<1,"portrait height remained stale: "+viewport.Bounds.Height+" expected "+expected);
+     File.WriteAllText(Path.Combine(folder,"portrait-condition.json"),JsonSerializer.Serialize(new{SyntheticLayoutDisplay=synthetic,portrait.Width,portrait.Height,PhysicalPortraitOutputTested=false}));
+    }finally{w.SettingsDisplaysForTest=null;}
    });
    await Test("portrait top-edge resizing preserves preview frame and canvas",async()=>{
     var frame=w.FindControl<Border>("OutputFrame")!;var before=frame.Bounds.Size;var canvas=host.Canvas.SessionId;var size=host.CanvasSize;

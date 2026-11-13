@@ -11,7 +11,7 @@
     },
     {
       "Name": "timing-status",
-      "Count": 7,
+      "Count": 8,
       "Evidence": "results.json",
       "Kind": "Status",
       "TimeoutSeconds": 120,
@@ -43,7 +43,7 @@
     },
     {
       "Name": "playback-integration",
-      "Count": 13,
+      "Count": 14,
       "Evidence": "results.json",
       "Kind": "Status",
       "TimeoutSeconds": 120,

@@ -74,6 +74,17 @@ public static class PlaybackIntegrationVerification
                 string latest=Program.Option("--fixtures") is {} f?Path.Combine(f,"h264-aac.mp4"):row.FilePath;var a=w.Preview.LoadAsync(row.FilePath);var b=w.Preview.LoadAsync(latest);await Task.WhenAll(a,b);Check(w.Preview.LoadedPath==latest,"stale request overwrote latest file");
                 Check(w.Preview.Snapshot.State==PreviewState.Ready&&!w.Preview.IsBusy&&!w.Preview.Armed,"latest request did not commit");
             });
+            await Test("stop cancels the whole load-and-play request",async()=>{
+                await w.Preview.LoadAsync(row.FilePath);await w.Preview.StopAsync();int starts=w.Preview.DecodeStarts;
+                var next=new CueRow{FilePath=row.FilePath,Enabled=false};await ShowProgramService.RefreshAsync(next,CancellationToken.None);w.Editor.Add(next);
+                var entered=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                w.Preview.LoadBeforeFrameForTest=token=>{entered.TrySetResult();return Task.Delay(Timeout.Infinite,token);};
+                try{
+                    var request=w.MeasureManualStartAsync(next);await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                    await w.Preview.StopAsync();await request;await Task.Delay(100);
+                    Check(w.Preview.Snapshot.State==PreviewState.Stopped&&w.Preview.DecodeStarts==starts&&!w.Preview.IsBusy,"cancelled request restarted previous media");
+                }finally{w.Preview.LoadBeforeFrameForTest=null;w.Editor.Delete(next);}
+            });
             string? fixture=Program.Option("--fixtures");
             if(fixture!=null)
             {

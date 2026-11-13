@@ -6,6 +6,7 @@ public sealed record AudioPlayhead(Guid SessionId,Guid CueId,int Generation,stri
 {
     // Preparation grants decode permission only; it never grants output permission.
     public bool PreparationRequested{get;init;}
+    [System.Text.Json.Serialization.JsonIgnore]
     public CancellationToken PreparationCancellation{get;init;}
     public bool CanPrepare(double now)=>Usable(now)||(PreparationRequested&&!PreparationCancellation.IsCancellationRequested&&SessionId!=Guid.Empty&&CueId!=Guid.Empty&&Path!=""&&Duration>0&&(SourceOwnsClock||now-HostSeconds<.250));
     public static AudioPlayhead Empty{get;}=new(Guid.Empty,Guid.Empty,0,"",0,0,false,0);

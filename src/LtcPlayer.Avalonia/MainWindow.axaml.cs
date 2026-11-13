@@ -141,7 +141,7 @@ public partial class MainWindow : Window
   if(ReferenceEquals(previewSelection,row))return;
   previewSelection=row;long version=++selectionVersion;
   previewCue=row.CueId;CancelScrub();
-  await Safe(async()=>{await Preview.LoadAsync(row.FilePath);if(version!=selectionVersion)return;UpdatePreview(Preview.Snapshot);});
+  await Safe(async()=>{if(!await Preview.LoadAsync(row.FilePath)||version!=selectionVersion)return;UpdatePreview(Preview.Snapshot);});
  }
  void ApplyVolume(){double value=Control<Slider>("Volume").Value;bool mute=false;Preview?.SetVolume(value,mute);playback.SetVolume((float)value,mute);if(audioUiReady){settings=settings with{AudioVolume=value};try{SaveSettings();}catch(Exception e){StatusMessage(e.Message);}}}
  void SetPreviewTimes(double? position,double? duration,double rate){var left=MediaTimeDisplay.Format(position,rate);var right=MediaTimeDisplay.Format(duration,rate);Control<TextBlock>("PreviewPosition").Text=left;Control<TextBlock>("PreviewDuration").Text=right;Control<TextBlock>("PreviewTime").Text=left+" / "+right;}
@@ -201,7 +201,7 @@ public partial class MainWindow : Window
   if(armed||busy)return;var files=await StorageProvider.OpenFilePickerAsync(new(){Title="上演プログラム読込",FileTypeFilter=[new("上演プログラム"){Patterns=["*.json"]}]});
   if(files.FirstOrDefault()?.TryGetLocalPath() is {} path)await Edit(async()=>{await Preview.StopAsync();await Editor.LoadAsync(path);});
  }
- async void PreviewPlayClick(object? s,RoutedEventArgs e)=>await Safe(async()=>{if(Grid.SelectedItem is not CueRow row)throw new InvalidOperationException("キューを選択してください。");if(!string.Equals(Preview.LoadedPath,row.FilePath,StringComparison.OrdinalIgnoreCase))await Preview.LoadAsync(row.FilePath);await Preview.PlayAsync();});
+ async void PreviewPlayClick(object? s,RoutedEventArgs e)=>await Safe(async()=>{if(Grid.SelectedItem is not CueRow row)throw new InvalidOperationException("キューを選択してください。");if(!string.Equals(Preview.LoadedPath,row.FilePath,StringComparison.OrdinalIgnoreCase)&&!await Preview.LoadAsync(row.FilePath))return;await Preview.PlayAsync();});
  async void PreviewPauseClick(object? s,RoutedEventArgs e)=>await Safe(()=>Preview.PauseAsync());
  async void PreviewStopClick(object? s,RoutedEventArgs e)=>await Safe(()=>Preview.StopAsync());
  async Task SeekAsync(){if(!updatingSeek&&!armed&&!LtcHasPriority&&!SyncOwnsSurface)await Safe(()=>Preview.SeekAsync(Control<Slider>("Seek").Value));}

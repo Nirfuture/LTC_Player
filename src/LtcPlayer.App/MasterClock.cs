@@ -14,6 +14,7 @@ public record TimecodeRate(string Name, int Nominal, double Fps, bool Drop)
         var parts=value.Split(':',';'); if(parts.Length!=4) throw new InvalidDataException("TCはHH:MM:SS:FFで入力してください。");
         var p=parts.Select(int.Parse).ToArray(); return Frames(p[0],p[1],p[2],p[3])/Fps;
     }
+    public double FramesToSeconds(int frames)=>frames/Fps;
     public double DaySeconds => ((24*3600L*Nominal)-(Drop?2592:0))/Fps;
 }
 public enum SyncState { WAITING, LOCKED, FREEWHEEL, LOST, RESYNC, ERROR }

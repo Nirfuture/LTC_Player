@@ -19,7 +19,7 @@ public partial class MainWindow
     else if(cue==null)inactive="待機中";
     else if(o.Recovering)inactive="再同期中";
     else if(o.CueId!=cue.CueId||o.FramePts==null)inactive="準備中";
-    else error=input.Seconds+settings.Offset-cue.Start-o.FramePts.Value;
+    else error=input.Seconds+Editor.Rate.FramesToSeconds(settings.Offset)-cue.Start-o.FramePts.Value;
    }
   }else{
    identity=$"manual/{Preview.PlaybackSessionId}/{Preview.SourceGeneration}";
