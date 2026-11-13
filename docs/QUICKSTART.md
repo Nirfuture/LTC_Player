@@ -2,14 +2,14 @@
 
 ## 動作環境
 
-Windows 11 x64に対応しています。初めて使用するPCには、[Visual C++ v14 x64ランタイム](https://aka.ms/vc14/vc_redist.x64.exe)と[FFmpeg・ffprobe（Windows用）](https://www.gyan.dev/ffmpeg/builds/)を導入します。
+Windows 11 x64に対応しています。以下の導入が必要です。
 
-<details>
-<summary>導入手順</summary>
+#### Visual C++ v14 x64ランタイム
 
-[Visual C++ v14 x64ランタイム](https://aka.ms/vc14/vc_redist.x64.exe)をダウンロードし、インストーラーを実行します。
+1. [Visual C++ v14 x64ランタイム](https://learn.microsoft.com/ja-jp/cpp/windows/latest-supported-vc-redist#latest-supported-redistributable-version)（サポートされている最新の再頒布可能パッケージ バージョン・X64）をダウンロードします
+2. インストーラーを実行します。
 
-FFmpeg・ffprobeは次の手順で設定します。
+#### FFmpeg・ffprobe
 
 1. [FFmpeg・ffprobeのWindows用ビルド](https://www.gyan.dev/ffmpeg/builds/)を取得し、展開します。
 2. `ffmpeg.exe`と`ffprobe.exe`が入った`bin`フォルダーを開き、アドレスバーのパスをコピーします。
