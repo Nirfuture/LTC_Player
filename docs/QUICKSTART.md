@@ -33,7 +33,7 @@ LTC Playerが起動している場合は、終了して起動し直します。
 
 ## 起動
 
-[LTC Player 0.1.0-preview.10（Windows x64）をダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.10/LtcPlayer-0.1.0-preview.10-win-x64.zip)
+[LTC Player 0.1.0-preview.11（Windows x64）をダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.11/LtcPlayer-0.1.0-preview.11-win-x64.zip)
 
 ZIPをすべて展開し、`LtcPlayer.Avalonia.exe`を起動します。
 
