@@ -6,7 +6,7 @@ Windows 11 x64に対応しています。以下の導入が必要です。
 
 #### Visual C++ v14 x64ランタイム
 
-1. [Visual C++ v14 x64ランタイム](https://learn.microsoft.com/ja-jp/cpp/windows/latest-supported-vc-redist#latest-supported-redistributable-version)（サポートされている最新の再頒布可能パッケージ バージョン・X64）をダウンロードします
+1. [Visual C++ v14 x64ランタイム](https://learn.microsoft.com/ja-jp/cpp/windows/latest-supported-vc-redist#latest-supported-redistributable-version)（サポートされている最新の再頒布可能パッケージ バージョン・x64）をダウンロードします
 2. インストーラーを実行します。
 
 #### FFmpeg・ffprobe
@@ -23,7 +23,7 @@ ffmpeg -version
 ffprobe -version
 ```
 
-LTC Playerが起動している場合は、終了して起動し直します。
+すでにLTC Playerが起動している場合は、終了して起動し直します。
 
 </details>
 
@@ -31,7 +31,7 @@ LTC Playerが起動している場合は、終了して起動し直します。
 
 [LTC Player 0.1.0-preview.11（Windows x64）をダウンロード](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.11/LtcPlayer-0.1.0-preview.11-win-x64.zip)
 
-ZIPをすべて展開し、`LtcPlayer.Avalonia.exe`を起動します。
+ZIPをすべて展開し、直下の`LtcPlayer.Avalonia.exe`を起動します。
 
 ## キュー登録と手動再生
 
@@ -41,7 +41,7 @@ ZIPをすべて展開し、`LtcPlayer.Avalonia.exe`を起動します。
 
 ② **開始TC**：再生を開始したいタイムコードを入力します。
 
-③ **有効**：再生する行にチェックを入れます。チェックを外した行は、LTC受信時には再生されません。
+③ **有効**：再生したい行にチェックを入れます。チェックを外した行は、LTC受信時には再生されません。
 
 ④ **確認**：▶で手動再生、Ⅱで一時停止、■で停止します。
 
