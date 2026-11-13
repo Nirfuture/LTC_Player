@@ -1,21 +1,17 @@
 # クイックスタート
 
-LTC Playerは、LTC（音声タイムコード）に合わせて動画を再生するWindows用ツールです。複数の動画をキューに登録し、動画ごとに再生を開始するタイムコードを指定できます。
-
-手動再生、外部ディスプレイへの映像出力、動画の音声出力、蓋絵への切り替えにも対応しています。
-
 ## 動作環境
 
-Windows 11 x64に対応しています。初めて使用するPCには、[Visual C++ランタイム](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)と[FFmpeg・ffprobe](https://ffmpeg.org/download.html)を導入します。
+Windows 11 x64に対応しています。初めて使用するPCには、[Visual C++ v14 x64ランタイム](https://aka.ms/vc14/vc_redist.x64.exe)と[FFmpeg・ffprobe（Windows用）](https://www.gyan.dev/ffmpeg/builds/)を導入します。
 
 <details>
 <summary>導入手順</summary>
 
-[Microsoft公式のダウンロード案内](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)で、最新のVisual C++ v14ランタイムの一覧から「X64」を選びます。ダウンロードしたインストーラーを実行します。
+[Visual C++ v14 x64ランタイム](https://aka.ms/vc14/vc_redist.x64.exe)をダウンロードし、インストーラーを実行します。
 
 FFmpeg・ffprobeは次の手順で設定します。
 
-1. [FFmpegのダウンロードページ](https://ffmpeg.org/download.html)からWindows用ビルドを取得し、展開します。
+1. [FFmpeg・ffprobeのWindows用ビルド](https://www.gyan.dev/ffmpeg/builds/)を取得し、展開します。
 2. `ffmpeg.exe`と`ffprobe.exe`が入った`bin`フォルダーを開き、アドレスバーのパスをコピーします。
 3. Windowsの検索で「環境変数」と入力し、「環境変数を編集」を開きます。
 4. ユーザー環境変数の「Path」を選び、「編集」→「新規」の順に押します。コピーしたパスを追加し、「OK」で閉じます。
@@ -51,7 +47,7 @@ ZIPをすべて展開し、`LtcPlayer.Avalonia.exe`を起動します。
 
 ⑤ **シークバー**：再生位置を変更します。
 
-⑥ **音声ON/OFF**：音声出力を切り替えます。出力先は設定の「音声出力」で選択します。
+⑥ **音声ON/OFF**：音声出力を切り替えます。**起動時はOFFです。** 出力先は設定の「音声出力」で選択します。
 
 > [!WARNING]
 > **注意：LTC信号の受信中は、手動再生・シーク操作が無効になります。**
@@ -66,12 +62,12 @@ LTC入力機器をPCに接続し、画面右上の設定アイコンから「LTC
 画像の①〜③を設定し、④「適用」を押します。
 
 1. デバイス：LTCを入力する機器
-2. チャンネル：LTCを接続した側のLまたはR
+2. チャンネル：LTCを入力するチャンネル（LまたはR）
 3. 形式：送信元のフレームレートとDF/NDFに合わせた形式
 
 <a href="images/quickstart-input.png"><img src="images/quickstart-input.png" alt="LTC入力。①デバイス、②チャンネル、③形式を選び、④適用。機器名は例示。" width="480"></a>
 
-同梱のテスト動画を使用する場合は、送信元とアプリのLTC形式を`29.97 DF`に設定します。最初の動画の開始TCは`00:00:05;00`です。
+同梱のテスト動画を使用する場合は、送信元とアプリのLTC形式を`29.97 DF`に設定します。
 
 設定画面を閉じ、送信元からLTCを送ります。「LTC受信中」が緑色になり、プレビューに動画が表示されることを確認します。
 
@@ -85,19 +81,11 @@ LTC入力機器をPCに接続し、画面右上の設定アイコンから「LTC
 
 <a href="images/quickstart-output-start.png"><img src="images/quickstart-output-start.png" alt="画面右上の③出力開始ボタン。" width="400"></a>
 
-外部映像を停止するには、画面右上の「出力停止」を押し、表示される確認画面で「出力を停止」を選びます。
+「出力停止」で外部ディスプレイへの出力を停止します。確認画面で「出力を停止」を選びます。外部映像を停止しても、アプリ内の映像・音声の再生は継続します。
 
 ## 蓋絵
 
-蓋絵は、動画の代わりに表示する静止画です。異常発生時に手動で映像を隠したり、待機中にイベントロゴを表示したりする際に使用します。メイン画面の「蓋絵」で操作します。
-
-画像を登録していない場合は、黒画面に切り替わります。
-
-1. 外部出力を停止しているとき、「変更」を押すことで、PNG/JPEG画像を登録することができます。
-2. 「フェード」で切り替えにかける秒数を指定します。0秒にすると即時に切り替わります。
-3. 「蓋絵を表示」で静止画に切り替え、「映像に戻す」で動画に戻します。
-
-蓋絵の表示中も、動画の再生と音声出力は継続します。
+蓋絵は、動画の代わりに表示する静止画です。操作方法は[操作リファレンスの「蓋絵」](USER_GUIDE.md#cover)を参照してください。
 
 ## 保存
 

@@ -6,9 +6,9 @@ MP4/H.264、MOV/HAP・HAP Qに対応しています。動画ごとに開始タ�
 
 ## ダウンロード
 
-[Windows版 ZIP · 0.1.0-preview.11](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.11/LtcPlayer-0.1.0-preview.11-win-x64.zip) · [リリース一覧](https://github.com/Nirfuture/LTC_Player/releases)
+[Windows版 ZIP · 0.1.0-preview.11](https://github.com/Nirfuture/LTC_Player/releases/download/v0.1.0-preview.11/LtcPlayer-0.1.0-preview.11-win-x64.zip)
 
-Windows 11 x64対応。現在はプレビュー版です。使用する環境で事前に動作を確認してください。
+Windows 11 x64対応。現在はプレビュー版です。
 
 ## 使い方
 
