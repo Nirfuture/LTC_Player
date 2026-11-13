@@ -76,14 +76,17 @@ public partial class MainWindow : Window
    if(loadDefault&&!File.Exists(Program.Option("--settings")??InputSettings.PathName))settings=settings with{Rate="29.97 DF"};
    Editor.Rate=TimecodeRate.Modes.FirstOrDefault(r=>r.Name==settings.Rate)??TimecodeRate.Modes[1];
    LoadOutputSelection();await LoadPresentationSettingsAsync();
-   if(!Program.Arguments.Any(a=>a.StartsWith("--verify-",StringComparison.Ordinal))||Program.Option("--verify-audio-ui")!=null||Program.Option("--verify-preview-ui")!=null||Program.Option("--verify-ui-design")!=null||Program.Option("--verify-ui-corrections")!=null)await InitializeAudioUiAsync();
+   if(!Program.Arguments.Any(a=>a.StartsWith("--verify-",StringComparison.Ordinal))||Program.Option("--verify-audio-ui")!=null||Program.Option("--verify-preview-ui")!=null||Program.Option("--verify-timing-status")!=null||Program.Option("--verify-ui-design")!=null||Program.Option("--verify-ui-corrections")!=null)await InitializeAudioUiAsync();
    await monitor.ConfigureAsync(settings);timer.Start();await Task.Delay(200);Surface.Black();Editor.Validate();StatusMessage("準備完了。動画を追加してください。");
    if(Program.Option("--program") is {} file)await Edit(()=>Editor.LoadAsync(file));
    else if(loadDefault)await Edit(()=>DefaultTestShow.LoadAsync(Editor));
 
    presentationReady=true;
 #if VERIFICATION
-   if(Program.Option("--verify-resize-anchor") is {} resizeFolder)await ResizeAnchorVerification.RunAsync(this,resizeFolder);
+   if(Program.Option("--verify-startup-measure") is {} startupFolder)await StartupMeasurementVerification.RunAsync(this,startupFolder);
+   else if(Program.Option("--verify-preview-clip") is {} clipFolder)await PreviewClipVerification.RunAsync(this,clipFolder);
+   else if(Program.Option("--verify-timing-status") is {} timingFolder)await TimingStatusVerification.RunAsync(this,timingFolder);
+   else if(Program.Option("--verify-resize-anchor") is {} resizeFolder)await ResizeAnchorVerification.RunAsync(this,resizeFolder);
    else if(Program.Option("--verify-audio-start") is {} audioStartFolder)await AudioStartVerification.RunAsync(this,audioStartFolder);
    else if(Program.Option("--verify-rendering-health") is {} healthFolder)await RenderingHealthVerification.RunAsync(this,healthFolder);
    else if(Program.Option("--verify-settings-apply") is {} settingsApplyFolder)await SettingsApplyVerification.RunAsync(this,settingsApplyFolder);
@@ -120,7 +123,7 @@ public partial class MainWindow : Window
    if(Program.Option("--verify-delivery-operations") is {} deliveryFolder)await DeliveryOperationsVerification.RunAsync(this,deliveryFolder);
    if(Program.Option("--verify-default-show") is {} defaultFolder)await DefaultTestShow.VerifyAsync(this,defaultFolder);
 #endif
-  }catch(Exception e){StatusMessage(e.Message);var folder=Program.Option("--verify-rendering-health")??Program.Option("--verify-resize-anchor")??Program.Option("--verify-audio-start")??Program.Option("--verify-settings-apply")??Program.Option("--verify-input-level")??Program.Option("--verify-ui-corrections")??Program.Option("--verify-ui-design")??Program.Option("--verify-coordinator")??Program.Option("--verify-preview-ui")??Program.Option("--verify-audio-ui")??Program.Option("--verify-audio-connected")??Program.Option("--verify-audio-service")??Program.Option("--verify-audio-decode")??Program.Option("--verify-audio-foundation")??Program.Option("--verify-playback-integration")??Program.Option("--verify-redesign-baseline")??Program.Option("--verify-shared-canvas")??Program.Option("--verify-phase5")??Program.Option("--verify-ui-update")??Program.Option("--verify-monitor")??Program.Option("--verify-preview-recovery")??Program.Option("--verify-delivery-operations")??Program.Option("--verify-default-show");if(folder!=null){Directory.CreateDirectory(folder);File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());Shutdown(1);}}
+  }catch(Exception e){StatusMessage(e.Message);var folder=Program.Option("--verify-startup-measure")??Program.Option("--verify-preview-clip")??Program.Option("--verify-timing-status")??Program.Option("--verify-rendering-health")??Program.Option("--verify-resize-anchor")??Program.Option("--verify-audio-start")??Program.Option("--verify-settings-apply")??Program.Option("--verify-input-level")??Program.Option("--verify-ui-corrections")??Program.Option("--verify-ui-design")??Program.Option("--verify-coordinator")??Program.Option("--verify-preview-ui")??Program.Option("--verify-audio-ui")??Program.Option("--verify-audio-connected")??Program.Option("--verify-audio-service")??Program.Option("--verify-audio-decode")??Program.Option("--verify-audio-foundation")??Program.Option("--verify-playback-integration")??Program.Option("--verify-redesign-baseline")??Program.Option("--verify-shared-canvas")??Program.Option("--verify-phase5")??Program.Option("--verify-ui-update")??Program.Option("--verify-monitor")??Program.Option("--verify-preview-recovery")??Program.Option("--verify-delivery-operations")??Program.Option("--verify-default-show");if(folder!=null){Directory.CreateDirectory(folder);File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());Shutdown(1);}}
  }
  internal static void Shutdown(int code){if(Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime d)d.Shutdown(code);}
  async Task Safe(Func<Task> action){try{await action();}catch(OperationCanceledException){}catch(Exception e){StatusMessage(e.Message);}}
@@ -138,7 +141,7 @@ public partial class MainWindow : Window
   if(ReferenceEquals(previewSelection,row))return;
   previewSelection=row;long version=++selectionVersion;
   previewCue=row.CueId;CancelScrub();
-  await Safe(async()=>{await Preview.LoadAsync(row.FilePath);if(version!=selectionVersion)return;UpdatePreview(Preview.Snapshot);});
+  await Safe(async()=>{if(!await Preview.LoadAsync(row.FilePath)||version!=selectionVersion)return;UpdatePreview(Preview.Snapshot);});
  }
  void ApplyVolume(){double value=Control<Slider>("Volume").Value;bool mute=false;Preview?.SetVolume(value,mute);playback.SetVolume((float)value,mute);if(audioUiReady){settings=settings with{AudioVolume=value};try{SaveSettings();}catch(Exception e){StatusMessage(e.Message);}}}
  void SetPreviewTimes(double? position,double? duration,double rate){var left=MediaTimeDisplay.Format(position,rate);var right=MediaTimeDisplay.Format(duration,rate);Control<TextBlock>("PreviewPosition").Text=left;Control<TextBlock>("PreviewDuration").Text=right;Control<TextBlock>("PreviewTime").Text=left+" / "+right;}
@@ -198,7 +201,7 @@ public partial class MainWindow : Window
   if(armed||busy)return;var files=await StorageProvider.OpenFilePickerAsync(new(){Title="上演プログラム読込",FileTypeFilter=[new("上演プログラム"){Patterns=["*.json"]}]});
   if(files.FirstOrDefault()?.TryGetLocalPath() is {} path)await Edit(async()=>{await Preview.StopAsync();await Editor.LoadAsync(path);});
  }
- async void PreviewPlayClick(object? s,RoutedEventArgs e)=>await Safe(async()=>{if(Grid.SelectedItem is not CueRow row)throw new InvalidOperationException("キューを選択してください。");if(!string.Equals(Preview.LoadedPath,row.FilePath,StringComparison.OrdinalIgnoreCase))await Preview.LoadAsync(row.FilePath);await Preview.PlayAsync();});
+ async void PreviewPlayClick(object? s,RoutedEventArgs e)=>await Safe(async()=>{if(Grid.SelectedItem is not CueRow row)throw new InvalidOperationException("キューを選択してください。");if(!string.Equals(Preview.LoadedPath,row.FilePath,StringComparison.OrdinalIgnoreCase)&&!await Preview.LoadAsync(row.FilePath))return;await Preview.PlayAsync();});
  async void PreviewPauseClick(object? s,RoutedEventArgs e)=>await Safe(()=>Preview.PauseAsync());
  async void PreviewStopClick(object? s,RoutedEventArgs e)=>await Safe(()=>Preview.StopAsync());
  async Task SeekAsync(){if(!updatingSeek&&!armed&&!LtcHasPriority&&!SyncOwnsSurface)await Safe(()=>Preview.SeekAsync(Control<Slider>("Seek").Value));}

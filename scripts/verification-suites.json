@@ -2,6 +2,22 @@
   "Version": 1,
   "Suites": [
     {
+      "Name": "preview-clip",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "timing-status",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
       "Name": "settings-apply",
       "Count": 14,
       "Evidence": "results.json",
@@ -19,7 +35,7 @@
     },
     {
       "Name": "rendering-health",
-      "Count": 7,
+      "Count": 8,
       "Evidence": "results.json",
       "Kind": "Status",
       "TimeoutSeconds": 120,
@@ -27,7 +43,7 @@
     },
     {
       "Name": "playback-integration",
-      "Count": 13,
+      "Count": 14,
       "Evidence": "results.json",
       "Kind": "Status",
       "TimeoutSeconds": 120,
@@ -59,7 +75,7 @@
     },
     {
       "Name": "audio-decode",
-      "Count": 7,
+      "Count": 8,
       "Evidence": "results.json",
       "Kind": "Status",
       "TimeoutSeconds": 120,
@@ -75,7 +91,7 @@
     },
     {
       "Name": "audio-connected",
-      "Count": 6,
+      "Count": 8,
       "Evidence": "results.json",
       "Kind": "Status",
       "TimeoutSeconds": 120,

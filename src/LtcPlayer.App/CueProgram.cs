@@ -65,12 +65,13 @@ public static class ShowProgramService
                 if(row.Enabled)result.Add(new(row.CueId,row.FilePath,start,row.Duration,row.FrameRate,row.Codec));
             }catch(Exception e){row.Error=e.Message;if(row.Enabled)errors.Add(row.Name+": "+e.Message);}
         }
+        var byId=rows.GroupBy(r=>r.CueId).ToDictionary(g=>g.Key,g=>g.First());
         foreach(var group in result.GroupBy(c=>c.Start).Where(g=>g.Count()>1))
-            foreach(var c in group){rows.First(r=>r.CueId==c.CueId).Error="同一開始TCの競合";errors.Add("同一開始TCの競合");}
+            foreach(var c in group){byId[c.CueId].Error="同一開始TCの競合";errors.Add("同一開始TCの競合");}
         for(int i=0;i<result.Count;++i)for(int j=i+1;j<result.Count;++j)
         {
             var a=result[i];var b=result[j];double start=Math.Max(a.Start,b.Start),end=Math.Min(a.Start+a.Duration,b.Start+b.Duration);
-            if(start<end){var ra=rows.First(r=>r.CueId==a.CueId);var rb=rows.First(r=>r.CueId==b.CueId);ra.Warning+=$"{rb.Name}と{end-start:F3}秒重複。 ";rb.Warning+=$"{ra.Name}と{end-start:F3}秒重複。 ";}
+            if(start<end){var ra=byId[a.CueId];var rb=byId[b.CueId];ra.Warning+=$"{rb.Name}と{end-start:F3}秒重複。 ";rb.Warning+=$"{ra.Name}と{end-start:F3}秒重複。 ";}
         }
         if(errors.Count>0)throw new InvalidDataException(string.Join(" / ",errors.Distinct()));return result;
     }

@@ -12,7 +12,7 @@ extern "C" __declspec(dllexport) int __cdecl canvas_create(int width,int height,
 extern "C" __declspec(dllexport) int __cdecl canvas_detach(void* handle){
  auto o=(Output*)handle;if(!o||!o->offscreen)return E_INVALIDARG;
  o->swap.Reset();if(o->window&&IsWindow(o->window)){SetWindowLongPtrW(o->window,GWLP_USERDATA,0);DestroyWindow(o->window);}
- o->window=nullptr;o->stopRequested=false;o->externalError=0;return S_OK;
+ o->window=nullptr;o->displayTracked=false;o->stopRequested=false;o->externalError=0;return S_OK;
 }
 extern "C" __declspec(dllexport) int __cdecl canvas_attach(void* handle,const Display* selected,int compatibility,int probe){
  auto o=(Output*)handle;if(!o||!o->offscreen||!selected||o->swap)return E_INVALIDARG;
@@ -29,16 +29,28 @@ extern "C" __declspec(dllexport) int __cdecl canvas_attach(void* handle,const Di
   DXGI_SWAP_CHAIN_DESC sd={};sd.BufferDesc.Width=o->width;sd.BufferDesc.Height=o->height;sd.BufferDesc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;sd.SampleDesc.Count=1;sd.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;sd.BufferCount=2;sd.OutputWindow=window;sd.Windowed=TRUE;sd.SwapEffect=compatibility?DXGI_SWAP_EFFECT_DISCARD:DXGI_SWAP_EFFECT_FLIP_DISCARD;
   ComPtr<IDXGISwapChain> swap;Check(factory->CreateSwapChain(o->device.Get(),&sd,&swap));Check(factory->MakeWindowAssociation(window,DXGI_MWA_NO_ALT_ENTER));
   if(o->last){ComPtr<ID3D11Texture2D> back;Check(swap->GetBuffer(0,IID_PPV_ARGS(&back)));o->context->CopyResource(back.Get(),o->last.Get());Check(swap->Present(0,0));}
-  o->externalError=0;o->window=window;o->swap=swap;o->confirmClose=true;o->stopRequested=false;SetWindowLongPtrW(window,GWLP_USERDATA,(LONG_PTR)o);
+  o->selectedDisplay=*selected;DISPLAY_DEVICEW monitorDevice={};monitorDevice.cb=sizeof(monitorDevice);
+  o->monitorDeviceId[0]=0;if(EnumDisplayDevicesW(selected->name,0,&monitorDevice,EDD_GET_DEVICE_INTERFACE_NAME))wcscpy_s(o->monitorDeviceId,monitorDevice.DeviceID);
+  o->displayTracked=true;o->displayInvalidated=false;o->externalError=0;o->window=window;o->swap=swap;o->confirmClose=true;o->stopRequested=false;SetWindowLongPtrW(window,GWLP_USERDATA,(LONG_PTR)o);
   ShowWindow(window,SW_SHOWNOACTIVATE);SetWindowPos(window,probe?HWND_NOTOPMOST:HWND_TOPMOST,selected->x,selected->y,probe?640:o->width,probe?360:o->height,SWP_NOACTIVATE|SWP_SHOWWINDOW);return S_OK;
  }catch(HRESULT hr){if(window)DestroyWindow(window);return hr;}catch(...){if(window)DestroyWindow(window);return E_OUTOFMEMORY;}
 }
 // Re-present the existing composition; attaching/detaching never re-composes or changes it.
 extern "C" __declspec(dllexport) int __cdecl canvas_output_refresh(void* handle){
- auto o=(Output*)handle;if(!o||!o->offscreen)return E_INVALIDARG;if(!o->swap||!o->last)return S_FALSE;
+ auto o=(Output*)handle;if(!o||!o->offscreen)return E_INVALIDARG;if(o->displayTracked&&!OutputDisplayConnected(o))HideDisconnectedOutput(o);if(o->externalError<0)return o->externalError;if(!o->swap||!o->last)return S_FALSE;
  try{if(!IsWindow(o->window))return HRESULT_FROM_WIN32(ERROR_INVALID_WINDOW_HANDLE);ComPtr<ID3D11Texture2D> back;Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));o->context->CopyResource(back.Get(),o->last.Get());return o->swap->Present(0,DXGI_PRESENT_DO_NOT_WAIT);}catch(HRESULT hr){return hr;}
 }
 
-extern "C" __declspec(dllexport) int __cdecl canvas_output_error(void* handle){auto o=(Output*)handle;return o?o->externalError:E_INVALIDARG;}
+extern "C" __declspec(dllexport) int __cdecl canvas_output_error(void* handle){auto o=(Output*)handle;if(o&&o->displayTracked&&!OutputDisplayConnected(o))HideDisconnectedOutput(o);return o?o->externalError:E_INVALIDARG;}
 
+// Uses the real window-message path without changing the machine's display configuration.
+extern "C" __declspec(dllexport) int __cdecl canvas_display_change_test(void* handle){
+ auto o=(Output*)handle;if(!o||!o->window||!o->displayTracked)return E_INVALIDARG;
+ SendMessageW(o->window,WM_DISPLAYCHANGE,0,0);
+ if(!IsWindowVisible(o->window)||o->externalError<0)return E_FAIL;
+ // Simulate the selected endpoint disappearing; do not alter any OS display settings.
+ o->selectedDisplay.name[0]=0;
+ SendMessageW(o->window,WM_DISPLAYCHANGE,0,0);
+ return !IsWindowVisible(o->window)&&o->externalError==HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_CONNECTED)?S_OK:E_FAIL;
+}
 extern "C" __declspec(dllexport) int __cdecl canvas_device_error(void* handle){auto o=(Output*)handle;return o&&o->device?o->device->GetDeviceRemovedReason():E_INVALIDARG;}

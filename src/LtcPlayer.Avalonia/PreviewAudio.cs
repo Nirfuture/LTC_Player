@@ -59,7 +59,7 @@ public sealed class PreviewAudio : IAsyncDisposable
  }
  async Task Decode(string path,double seek,double duration,CancellationToken token)
  {
-  using var p=MediaDecoder.Start("ffmpeg",["-hide_banner","-v","error","-nostdin","-ss",seek.ToString("R",CultureInfo.InvariantCulture),"-i",path,"-map","0:a:0","-vn","-sn","-af","aresample=async=1:first_pts=0,apad","-t",Math.Max(.001,duration-seek).ToString("R",CultureInfo.InvariantCulture),"-ar","48000","-ac","2","-c:a","pcm_f32le","-f","f32le","pipe:1"]);
+  using var p=MediaDecoder.Start("ffmpeg",["-hide_banner","-v","error","-nostdin","-ss",MediaDecoder.FfmpegTime(seek),"-i",path,"-map","0:a:0","-vn","-sn","-af","aresample=async=1:first_pts=0,apad","-t",MediaDecoder.FfmpegTime(Math.Max(.001,duration-seek)),"-ar","48000","-ac","2","-c:a","pcm_f32le","-f","f32le","pipe:1"]);
   using var reg=token.Register(()=>MediaDecoder.Kill(p));var errors=p.StandardError.ReadToEndAsync();
   try {
    while(true){var bytes=new byte[2048*8];int at=0;
@@ -76,10 +76,12 @@ public sealed class PreviewAudio : IAsyncDisposable
  public static async Task<PreviewAudioInfo> InspectAsync(string path,CancellationToken token)
  {
   using var timeout=CancellationTokenSource.CreateLinkedTokenSource(token);timeout.CancelAfter(TimeSpan.FromSeconds(15));
+  StartupMeasurementTrace.Mark("selection_audio_probe_begin");
   using var p=MediaDecoder.Start("ffprobe",["-v","error","-select_streams","a:0","-show_entries","stream=codec_name","-of","json",path]);
   using var reg=timeout.Token.Register(()=>MediaDecoder.Kill(p));var output=p.StandardOutput.ReadToEndAsync();var errors=p.StandardError.ReadToEndAsync();
   await p.WaitForExitAsync(timeout.Token);string detail=await errors;if(p.ExitCode!=0)throw new IOException(detail);
   using var doc=JsonDocument.Parse(await output);var streams=doc.RootElement.GetProperty("streams");
+  StartupMeasurementTrace.Mark("selection_audio_probe_complete");
   if(streams.GetArrayLength()==0)return new("",false,"音声なし");
   string codec=streams[0].GetProperty("codec_name").GetString()??"";bool supported=codec=="aac"||codec.StartsWith("pcm_",StringComparison.Ordinal);
   return new(codec,supported,supported?$"{codec} / Windows既定出力":$"{codec}はプレビュー音声対象外（映像のみ）");

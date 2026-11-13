@@ -35,7 +35,7 @@ static int PresentComposite(Output* o){
    ID3D11ShaderResourceView* clear[2]={};o->context->PSSetShaderResources(0,2,clear);o->context->OMSetRenderTargets(0,nullptr,nullptr);result=o->compositeImage;
   }
   o->last=result;
-  if(!o->swap)return S_OK;
+  if(!o->swap||(o->offscreen&&o->externalError<0))return S_OK;
   try{
    ComPtr<ID3D11Texture2D> back;Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));o->context->CopyResource(back.Get(),result.Get());HRESULT hr=o->swap->Present(o->embedded?0:1,0);
    if(o->offscreen&&FAILED(hr)){o->externalError=hr;return S_OK;}return hr;

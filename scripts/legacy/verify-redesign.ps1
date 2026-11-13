@@ -1,3 +1,4 @@
+# Legacy focused runner. Prefer scripts/test.ps1 for complete validation.
 param(
  [string]$DotnetPath='dotnet',
  [string]$AssemblyPath,
@@ -5,7 +6,7 @@ param(
  [string]$FixturesPath
 )
 $ErrorActionPreference='Stop'
-$repo=Split-Path $PSScriptRoot -Parent
+$repo=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 if(-not $AssemblyPath){$AssemblyPath=Join-Path $repo 'artifacts/verification/LtcPlayer.Avalonia.dll'}
 if(-not $ResultPath){$ResultPath=Join-Path $repo ('artifacts/redesign-'+(Get-Date -Format yyyyMMdd-HHmmss))}
 if(-not(Test-Path -LiteralPath $AssemblyPath)){throw 'Build with -p:EnableVerification=true before running this script.'}

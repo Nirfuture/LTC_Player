@@ -24,7 +24,7 @@ public partial class MainWindow
   coverTimer.Start();
  }
  async Task LoadPresentationSettingsAsync(){
-  var display=selectedDisplay;Surface.ConfigureCanvas(display?.Width??1920,display?.Height??1080);
+  var display=selectedDisplay;Surface.ConfigureCanvas(display?.Width??1920,display?.Height??1080);UpdateResponsiveLayout();
   try{cover.Image=await CoverImageLoader.LoadAsync(settings.CoverPath);}catch(Exception e){cover.Image=null;coverLoadWarning=e.Message;StatusMessage("蓋画を読み込めません。黒を使用します："+e.Message);}
   Control<NumericUpDown>("FadeSeconds").Value=(decimal)settings.FadeSeconds;
  }
@@ -71,7 +71,7 @@ public partial class MainWindow
   if(!presentationReady||closing||closePending||busy||!Surface.Ready||Surface.Canvas.SharedDeviceError<0||MasterClock.Timestamp()<playback.RetryAt)return;
   try{
    var size=Surface.CanvasSize;
-   await playback.ReconcileAsync(programRevision,Editor.CanArm,()=>ShowProgramService.Validate(Editor.Rows,Editor.Rate),new OutputDisplay{Width=size.Width,Height=size.Height},settings.Offset/Editor.Rate.Fps);
+   await playback.ReconcileAsync(programRevision,Editor.CanArm,()=>ShowProgramService.Validate(Editor.Rows,Editor.Rate),new OutputDisplay{Width=size.Width,Height=size.Height},Editor.Rate.FramesToSeconds(settings.Offset));
    UpdateEnabled();
   }catch(Exception e){playback.DeferRetry();StatusMessage("同期プレビュー："+e.Message);await StopSyncPreviewAsync();}
  }

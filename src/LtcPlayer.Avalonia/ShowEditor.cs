@@ -38,7 +38,8 @@ public sealed class ShowEditor
  {
   Editable();var load=await ShowProgramService.LoadAsync(file,CancellationToken.None);Editable();
   foreach(var r in Rows)r.PropertyChanged-=Edited;Rows.Clear();Rate=load.Rate;
-  foreach(var r in load.Rows)Add(r);Validate();
+  foreach(var r in load.Rows){Rows.Add(r);r.PropertyChanged+=Edited;}
+  Renumber();
  }
  public Task SaveAsync(string file){Editable();return ShowProgramService.SaveAsync(file,Rows,Rate);}
 }

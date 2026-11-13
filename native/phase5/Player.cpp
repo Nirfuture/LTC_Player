@@ -25,6 +25,7 @@ extern "C" __declspec(dllexport) int __cdecl output_displays(Display* data,int c
     return (int)ds.size();
 }
 struct Output {
+    Display selectedDisplay={}; wchar_t monitorDeviceId[128]={}; bool displayTracked=false,displayInvalidated=false;
     HWND window=nullptr; int width=0,height=0; int externalError=0; bool offscreen=false; bool embedded=false,ownsWindow=true,confirmClose=false,stopRequested=false;
     ComPtr<IDXGISwapChain> monitor;HWND monitorWindow=nullptr;int monitorWidth=0,monitorHeight=0,monitorError=0;
     ComPtr<ID3D11Texture2D> monitorImage;ComPtr<ID3D11RenderTargetView> monitorTarget;
@@ -52,7 +53,32 @@ struct Output {
     ~Output(){if(context){context->ClearState();context->Flush();}monitor.Reset();swap.Reset();if(context)context->Flush();context.Reset();upload.Reset();device.Reset();if(ownsWindow && window && IsWindow(window))DestroyWindow(window);}
 };
 static void Check(HRESULT hr){if(FAILED(hr)) throw hr;}
+// Never let Windows relocate a live topmost output onto another monitor.
+static bool OutputDisplayConnected(Output* o) {
+    if(!o->displayTracked)return true;
+    auto& d=o->selectedDisplay;RECT bounds={d.x,d.y,d.x+d.width,d.y+d.height};
+    HMONITOR monitor=MonitorFromRect(&bounds,MONITOR_DEFAULTTONULL);MONITORINFOEXW info={};info.cbSize=sizeof(info);
+    if(!monitor||!GetMonitorInfoW(monitor,&info)||wcscmp(info.szDevice,d.name)||!EqualRect(&info.rcMonitor,&bounds))return false;
+    DISPLAY_DEVICEW device={};device.cb=sizeof(device);
+    return !o->monitorDeviceId[0]||(EnumDisplayDevicesW(d.name,0,&device,EDD_GET_DEVICE_INTERFACE_NAME)&&!wcscmp(device.DeviceID,o->monitorDeviceId));
+}
+static void HideDisconnectedOutput(Output* o) {
+    if(!o||!o->displayTracked||o->displayInvalidated)return;
+    o->displayInvalidated=true;
+    o->externalError=HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_CONNECTED);
+    if(o->window&&IsWindow(o->window)){
+        ShowWindow(o->window,SW_HIDE);
+        SetWindowPos(o->window,HWND_NOTOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_HIDEWINDOW);
+    }
+}
 static LRESULT CALLBACK OutputProc(HWND window,UINT message,WPARAM w,LPARAM l) {
+    auto output=(Output*)GetWindowLongPtrW(window,GWLP_USERDATA);
+    // Ignore notifications that leave the selected endpoint and geometry unchanged.
+    if(message==WM_DISPLAYCHANGE&&output&&output->displayTracked){if(!OutputDisplayConnected(output))HideDisconnectedOutput(output);return 0;}
+    if(message==WM_WINDOWPOSCHANGING&&output&&output->displayTracked){
+        if(!OutputDisplayConnected(output))HideDisconnectedOutput(output);
+        if(output->externalError<0){auto pos=(WINDOWPOS*)l;pos->flags=(pos->flags&~SWP_SHOWWINDOW)|SWP_HIDEWINDOW|SWP_NOACTIVATE;pos->hwndInsertAfter=HWND_NOTOPMOST;}
+    }
     if(message==WM_CLOSE || (message==WM_KEYDOWN && w==VK_ESCAPE)) {auto o=(Output*)GetWindowLongPtrW(window,GWLP_USERDATA);if(o&&o->confirmClose)o->stopRequested=true;else DestroyWindow(window); return 0; }
     return DefWindowProcW(window,message,w,l);
 }

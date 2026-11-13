@@ -17,7 +17,13 @@ public static class AudioServiceVerification
   {
    await Test("off owns no decoder or WASAPI stream",async()=>{await using var s=new AudioOutputService(Read,true);await s.ConfigureAsync(false,"",.5f,false);Check(AudioOutputSink.ActiveStreams==0&&AudioDecodeSession.ActiveDecoders==0,"off resources");});
    await Test("enable follows current video time and mute preserves clock",async()=>{
-    Source(at:1);await using var s=new AudioOutputService(Read,true);await s.ConfigureAsync(true,"",.5f,false);await Wait(()=>s.Snapshot.State==SharedAudioState.Playing,s);
+    Source(at:1,advancing:false);Volatile.Write(ref head,Read() with{PreparationRequested=true});
+    await using var s=new AudioOutputService(Read,true);await s.ConfigureAsync(true,"",.5f,false);
+    await Wait(()=>s.Snapshot.State==SharedAudioState.Preparing&&s.Snapshot.BufferedBlocks>0,s);
+    await Task.Delay(100);var prepared=s.Snapshot;
+    Check(prepared.PlayedPts==null&&prepared.HardwarePadding==0,"preparation reached hardware before playback permission");
+    Volatile.Write(ref head,Read() with{Advancing=true,PreparationRequested=false});await Wait(()=>s.Snapshot.State==SharedAudioState.Playing,s);
+    Check(s.Snapshot.PreparationStarts==prepared.PreparationStarts,"playback restarted prepared decoder");
     var a=s.Snapshot;Check(a.PlayedPts>1&&Math.Abs(a.ErrorSeconds??1)<.1,"not current source time");s.SetVolume(.3f,true);await Wait(()=>s.Snapshot.State==SharedAudioState.Muted,s);await Task.Delay(250);var b=s.Snapshot;
     Check(b.SinkSession==a.SinkSession&&b.PreparationStarts==a.PreparationStarts&&b.PlayedPts>a.PlayedPts+.15&&b.AppliedGain==0,"mute restarted or stopped clock");
     s.SetVolume(.3f,false);await Wait(()=>s.Snapshot.State==SharedAudioState.Playing,s);File.WriteAllText(Path.Combine(folder,"tracking.json"),JsonSerializer.Serialize(s.Snapshot));
@@ -25,7 +31,14 @@ public static class AudioServiceVerification
    await Test("pause flushes old audio and resume uses current time",async()=>{
     Source(at:.5);await using var s=new AudioOutputService(Read,true);await s.ConfigureAsync(true,"",.5f,false);await Wait(()=>s.Snapshot.State==SharedAudioState.Playing,s);var session=s.Snapshot.SinkSession;
     Volatile.Write(ref head,Read() with{Advancing=false});await Wait(()=>s.Snapshot.State==SharedAudioState.Waiting&&AudioDecodeSession.ActiveDecoders==0,s);
-    Check(s.Snapshot.HardwarePadding==0,"pause queued audio");Volatile.Write(ref head,Read() with{Position=2,Advancing=true});await Wait(()=>s.Snapshot.State==SharedAudioState.Playing,s);
+    Check(s.Snapshot.HardwarePadding==0,"pause queued audio");
+    using(var preparationCancel=new CancellationTokenSource()){
+     Volatile.Write(ref head,Read() with{Position=2,PreparationRequested=true,PreparationCancellation=preparationCancel.Token});
+     await Wait(()=>s.Snapshot.State==SharedAudioState.Preparing&&s.Snapshot.BufferedBlocks>0,s);
+     preparationCancel.Cancel();await Wait(()=>s.Snapshot.State==SharedAudioState.Waiting&&AudioDecodeSession.ActiveDecoders==0,s);
+     Check(s.Snapshot.HardwarePadding==0&&s.Snapshot.PlayedPts==null,"cancelled preparation leaked audio");
+    }
+    Volatile.Write(ref head,Read() with{Position=2,Advancing=true,PreparationRequested=false});await Wait(()=>s.Snapshot.State==SharedAudioState.Playing,s);
     Check(s.Snapshot.PlayedPts>=2&&s.Snapshot.SinkSession==session,"resume incorrect");
    });
    await Test("new generation and cue replace audio without replacing sink",async()=>{
@@ -42,6 +55,11 @@ public static class AudioServiceVerification
     Source("h264-mp3.mp4");await Wait(()=>s.Snapshot.State==SharedAudioState.NoAudio&&s.Snapshot.CueId==Read().CueId,s);Check(AudioDecodeSession.ActiveDecoders==0,"MP3 decoder");
    });
    await Test("stale source silences and explicit off releases resources",async()=>{
+    var anchor=new AudioPlayhead(Guid.NewGuid(),Guid.NewGuid(),1,"test",1,10,true,100);
+    Check(!anchor.Usable(101),"observation did not expire");
+    var owned=anchor with{SourceOwnsClock=true};
+    Check(owned.Usable(101)&&owned.Estimate(101)==2&&owned.HostSeconds==100,"owned clock contract");
+    Check(!(owned with{Advancing=false}).Usable(101),"stopped owned clock remained usable");
     Source();bool stale=false;AudioPlayhead Supplier()=>stale?Volatile.Read(ref head):Read();await using var s=new AudioOutputService(Supplier,true);await s.ConfigureAsync(true,"",.5f,false);await Wait(()=>s.Snapshot.State==SharedAudioState.Playing,s);
     stale=true;await Wait(()=>s.Snapshot.State==SharedAudioState.Waiting,s);await s.ConfigureAsync(false,"",.5f,false);Check(AudioDecodeSession.ActiveDecoders==0&&AudioOutputSink.ActiveStreams==0,"off leak");
    });

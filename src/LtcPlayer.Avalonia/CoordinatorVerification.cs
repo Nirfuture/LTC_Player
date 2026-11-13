@@ -33,10 +33,11 @@ public static class CoordinatorVerification
     await Until(()=>c.Observation?.FramePts>0&&c.Audio.State==SharedAudioState.Playing);var head=c.ReadAudioPlayhead();Check(head.SessionId==c.SynchronizationSession&&head.CueId==row.CueId&&head.LtcDriven,"source identities diverged");Check(head.Generation==c.Observation!.InputGeneration&&w.Preview.Armed,"ownership mismatch");
    });
    await Test("LTC reorder and unchanged validation preserve generation and audio",async()=>{
-    Interlocked.Exchange(ref frames,15);await Task.Delay(100);await Until(()=>c.Audio.State==SharedAudioState.Playing&&c.Audio.Generation==c.ReadAudioPlayhead().Generation);
+    Interlocked.Exchange(ref frames,15);await Task.Delay(100);await Until(()=>c.Audio.State==SharedAudioState.Playing&&c.Audio.Generation==c.ReadAudioPlayhead().Generation&&c.Observation?.InputGeneration==c.ReadAudioPlayhead().Generation&&Math.Abs((c.Observation?.FramePts??-10)-c.ReadAudioPlayhead().Position)<.15);
     var sync=c.SynchronizationSession;var canvas=w.Surface.Canvas.SessionId;var clock=w.Monitor.Clock;var head=c.ReadAudioPlayhead();var sink=c.Audio.SinkSession;int preparations=c.Audio.PreparationStarts;int inputStarts=w.Monitor.Starts;double? before=c.Observation!.FramePts;
     w.MoveCue(row,0);w.Editor.Validate();await Task.Delay(220);
     Check(c.SynchronizationSession==sync&&w.Surface.Canvas.SessionId==canvas&&ReferenceEquals(clock,w.Monitor.Clock)&&w.Monitor.Starts==inputStarts,"reorder replaced sync/canvas/input");
+    File.WriteAllText(Path.Combine(folder,"ltc-reorder-observation.json"),JsonSerializer.Serialize(new{Before=new{head,sink,preparations,FramePts=before},After=new{Head=c.ReadAudioPlayhead(),Audio=c.Audio,Observation=c.Observation}},new JsonSerializerOptions{WriteIndented=true}));
     Check(c.ReadAudioPlayhead().Generation==head.Generation&&c.Audio.SinkSession==sink&&c.Audio.PreparationStarts==preparations&&c.Observation!.FramePts>before,"reorder interrupted LTC audio/video");
    });
    await Test("actual schedule edit still invalidates the LTC run",async()=>{

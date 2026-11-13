@@ -109,6 +109,10 @@
       <TextBlock x:Name="PreviewTime" IsVisible="False"/>
       <Border Height="1" Background="#303743" Margin="0,3"/>
       <TextBlock x:Name="PreviewName" Text="キューを選択してください" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+      <WrapPanel Orientation="Horizontal">
+       <TextBlock x:Name="VideoTimingStatus" Text="映像：停止中" Margin="0,0,16,0" FontSize="13"/>
+       <TextBlock x:Name="AudioTimingStatus" Text="音声：OFF" FontSize="13"/>
+      </WrapPanel>
       <TextBlock x:Name="RunInfo" MinHeight="18" MaxLines="1" TextTrimming="CharacterEllipsis" Foreground="#A5B0BF" FontSize="12" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
       <TextBlock x:Name="PreviewInfo" MinHeight="18" MaxLines="1" TextTrimming="CharacterEllipsis" Foreground="#E6B566" FontSize="12" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
       <Grid x:Name="ActivitySlot" Height="28" RowDefinitions="4,*">
@@ -121,13 +125,12 @@
     </Border>
     <Border Classes="section" Grid.Row="1" Margin="0,12,0,0">
      <StackPanel x:Name="PreviewControls" Spacing="6">
-      <TextBlock Text="音声出力" Classes="section-title"/>
+      <TextBlock Text="音声" Classes="section-title"/>
       <Grid ColumnDefinitions="Auto,*,Auto">
        <ToggleButton x:Name="AudioEnabled" Classes="audio-power" Click="AudioEnabledClick" ToolTip.Tip="音声出力を開始" AutomationProperties.Name="音声出力を開始"><local:LucideIcon x:Name="AudioPowerIcon" Kind="volume-x"/></ToggleButton>
        <Slider x:Name="Volume" Grid.Column="1" Margin="8,0" Minimum="0" Maximum="1" Value="0.5" ToolTip.Tip="音声出力の音量"/>
        <TextBlock x:Name="VolumePercent" Grid.Column="2" Text="50%" Width="36" TextAlignment="Right" VerticalAlignment="Center" FontSize="12"/>
       </Grid>
-      <TextBlock x:Name="AudioStatus" Text="OFF" MaxLines="1" TextTrimming="CharacterEllipsis" Foreground="#A5B0BF" FontSize="12"/>
      </StackPanel>
     </Border>
     <Border Classes="section" Grid.Row="2" Margin="0,12,0,0">

@@ -1,28 +1,5 @@
-using System.Threading.Channels;
 using Dispatcher = LtcPlayer.Avalonia.UiDispatcher;
 namespace LtcPlayer.App;
-public sealed class FrameBuffer : IAsyncDisposable
-{
-    private readonly CancellationTokenSource cancel;
-    private readonly Channel<VideoFrame> frames=Channel.CreateBounded<VideoFrame>(8);
-    private readonly Task worker;
-    public bool Ended=>frames.Reader.Completion.IsCompletedSuccessfully;
-    public FrameBuffer(string path,int width,int height,double seek,CancellationToken token,MediaDecoder? decoder=null)
-    {
-        cancel=CancellationTokenSource.CreateLinkedTokenSource(token);
-        worker=Task.Run(async ()=>
-        {
-            try {await foreach(var f in (decoder??new MediaDecoder()).DecodeAsync(path,width,height,cancel.Token,seek)) await frames.Writer.WriteAsync(f,cancel.Token); frames.Writer.TryComplete();}
-            catch(Exception e){frames.Writer.TryComplete(e);}
-        });
-    }
-    public bool TryRead(out VideoFrame? frame)
-    {
-        if(frames.Reader.Completion.IsFaulted) frames.Reader.Completion.GetAwaiter().GetResult();
-        return frames.Reader.TryRead(out frame);
-    }
-    public async ValueTask DisposeAsync(){cancel.Cancel(); await worker; cancel.Dispose();}
-}
 public record SyncTelemetry(SyncState State,string Ltc,double Target,double? FramePts,int Presented,int Repeats,int Skipped,int Seeks)
 {
     public double HostSeconds {get;init;}=MasterClock.Timestamp();
@@ -33,7 +10,8 @@ public sealed class SynchronizedPlayback
     public SynchronizedPlayback(Dispatcher dispatcher)=>this.dispatcher=dispatcher;
     public async Task RunAsync(string path,OutputDisplay display,MasterClock clock,double start,double offsetSeconds,Action<SyncTelemetry> telemetry,CancellationToken token)
     {
-        await new MediaDecoder().InspectAsync(path,token);
+        var decoder=new MediaDecoder(reuseAnalysis:true,gpuScaling:true);
+        await decoder.InspectAsync(path,token);
         VideoRenderer? renderer=null; FrameBuffer? buffer=null;
         VideoFrame? current=null,next=null; var black=new byte[checked(display.Width*display.Height*4)];
         int generation=-1,presented=0,repeats=0,skipped=0,seeks=0; double lastTarget=double.NaN,previousPts=double.NaN,lastInterval=0.04;
@@ -51,7 +29,7 @@ public sealed class SynchronizedPlayback
                     if(buffer==null || snapshot.Generation!=generation || (!double.IsNaN(lastTarget) && (target<lastTarget-0.08 || target-lastTarget>0.5)))
                     {
                         if(buffer!=null) await buffer.DisposeAsync();
-                        buffer=new FrameBuffer(path,display.Width,display.Height,Math.Max(0,target-0.2),token);
+                        buffer=new FrameBuffer(path,display.Width,display.Height,Math.Max(0,target-0.2),token,decoder);
                         current=next=null; generation=snapshot.Generation; ++seeks; previousPts=double.NaN;
                         // Hold the last output while the new decode window is being prepared.
                     }

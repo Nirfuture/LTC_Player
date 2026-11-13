@@ -1,6 +1,8 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LtcPlayer.App;
 using System.Runtime.InteropServices;
 namespace LtcPlayer.Avalonia;
@@ -9,7 +11,9 @@ namespace LtcPlayer.Avalonia;
 public sealed class PreviewHost : NativeControlHost, ICoverRenderer
 {
     RenderSession? canvas;
-    nint window, container;
+    // clipWindow is the attachment supplied by NativeControlHost; Avalonia owns it.
+    // Clip that outer host so its background cannot extend beyond our viewport.
+    nint window, container, clipWindow;
     bool borrowedForVerification;
     int width=1920, height=1080;
     CoverBinding coverBinding=new();
@@ -20,6 +24,35 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
     public bool ProgramMode => borrowedForVerification || canvas?.OutputAttached==true;
     internal nint ProgramWindowForVerification => window;
     public int Presents { get; private set; }
+    Rect? effectiveViewport;
+    (int Left,int Top,int Right,int Bottom)? appliedClip;
+    public PreviewHost(){
+        EffectiveViewportChanged+=(_,e)=>{effectiveViewport=e.EffectiveViewport;UpdateNativeClip();};
+        LayoutUpdated+=(_,_)=>UpdateNativeClip();
+    }
+    void UpdateNativeClip(){
+        if(clipWindow==0)return;
+        var full=new Rect(Bounds.Size);var clip=effectiveViewport is {} visible?full.Intersect(visible):full;
+        // Native child windows do not inherit Avalonia clipping. Intersect actual
+        // ancestor bounds as well: the effective viewport may extend past the
+        // visible scroll area during a height-only resize.
+        foreach(var ancestor in this.GetVisualAncestors()){
+            if(!ancestor.ClipToBounds&&ancestor is not ScrollViewer&&ancestor is not TopLevel)continue;
+            if(ancestor.TranslatePoint(default,this) is {} origin)clip=clip.Intersect(new Rect(origin,ancestor.Bounds.Size));
+        }
+        double scale=TopLevel.GetTopLevel(this)?.RenderScaling??1;
+        var region=clip.Width<=0||clip.Height<=0?(0,0,0,0):((int)Math.Ceiling(clip.Left*scale),(int)Math.Ceiling(clip.Top*scale),(int)Math.Floor(clip.Right*scale),(int)Math.Floor(clip.Bottom*scale));
+        if(appliedClip==region)return;
+        nint handle=N.CreateRectRgn(region.Item1,region.Item2,region.Item3,region.Item4);
+        if(handle==0)return;
+        if(N.SetWindowRgn(clipWindow,handle,true)!=0)appliedClip=region;else N.DeleteObject(handle);
+    }
+#if VERIFICATION
+    internal (int Left,int Top,int Right,int Bottom) NativeClipForTest(){
+        nint region=N.CreateRectRgn(0,0,0,0);
+        try{if(N.GetWindowRgn(clipWindow,region)==0)throw new IOException("Preview window has no clip region");N.GetRgnBox(region,out var box);return(box.Left,box.Top,box.Right,box.Bottom);}finally{N.DeleteObject(region);}
+    }
+#endif
     public void ConfigureCanvas(int newWidth,int newHeight)
     {
         using var prepared=PrepareCanvas(newWidth,newHeight);
@@ -54,7 +87,7 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
             Dispatcher.UIThread.VerifyAccess();
             var old=host.canvas;var oldWindow=host.window;
             host.canvas=candidate;candidate=null;host.window=child;child=0;
-            host.width=newWidth;host.height=newHeight;host.coverBinding=new();
+            host.width=newWidth;host.height=newHeight;host.coverBinding=new();host.appliedClip=null;host.UpdateNativeClip();
             if(host.window!=0)N.ShowWindow(host.window,5);
             old?.Dispose();if(oldWindow!=0)N.preview_window_destroy(oldWindow);
         }
@@ -76,19 +109,20 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
     }
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
+        clipWindow=parent.Handle;
         Check(N.preview_child_create(parent.Handle,out container));
-        try{CreateCanvas();return new PlatformHandle(container,"HWND");}
+        try{CreateCanvas();appliedClip=null;UpdateNativeClip();return new PlatformHandle(container,"HWND");}
         catch{N.preview_window_destroy(container);container=0;throw;}
     }
     void CreateCanvas()
     {
         Check(N.preview_child_create(container,out window));
-        try{canvas=new(width,height);canvas.AttachPreview(window);coverBinding=new();Black();}
+        try{canvas=new(width,height);canvas.AttachPreview(window);coverBinding=new();appliedClip=null;Black();UpdateNativeClip();}
         catch{canvas?.Dispose();canvas=null;N.preview_window_destroy(window);window=0;throw;}
     }
     protected override void DestroyNativeControlCore(IPlatformHandle handle)
     {
-        try{canvas?.Dispose();}finally{canvas=null;N.preview_window_destroy(container);window=container=0;}
+        try{canvas?.Dispose();}finally{canvas=null;N.preview_window_destroy(container);window=container=clipWindow=0;}
     }
     public void Present(VideoFrame frame)
     {
@@ -115,6 +149,12 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
     static void Check(int hr){if(hr<0)throw new IOException($"Preview HWND failure 0x{hr:X8}");}
     static class N
     {
+        [StructLayout(LayoutKind.Sequential)]internal struct RectI{public int Left,Top,Right,Bottom;}
+        [DllImport("gdi32.dll")]internal static extern nint CreateRectRgn(int left,int top,int right,int bottom);
+        [DllImport("gdi32.dll")]internal static extern bool DeleteObject(nint handle);
+        [DllImport("gdi32.dll")]internal static extern int GetRgnBox(nint region,out RectI rect);
+        [DllImport("user32.dll")]internal static extern int SetWindowRgn(nint window,nint region,bool redraw);
+        [DllImport("user32.dll")]internal static extern int GetWindowRgn(nint window,nint region);
         [DllImport("user32.dll")]internal static extern bool ShowWindow(nint window,int command);
         const string D="PlayerNative.dll";
         [DllImport(D,CallingConvention=CallingConvention.Cdecl)]internal static extern int preview_child_create(nint parent,out nint child);

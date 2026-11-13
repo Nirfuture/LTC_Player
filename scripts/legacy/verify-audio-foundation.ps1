@@ -1,6 +1,7 @@
+# Legacy focused runner. Prefer scripts/test.ps1 for complete validation.
 param([string]$ExecutablePath,[string]$ResultPath)
 $ErrorActionPreference='Stop'
-$repo=Split-Path $PSScriptRoot -Parent
+$repo=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 if(-not $ExecutablePath){$ExecutablePath=Join-Path $repo 'artifacts/verification/LtcPlayer.Avalonia.exe'}
 if(-not $ResultPath){$ResultPath=Join-Path $repo ('artifacts/audio-v06-'+(Get-Date -Format yyyyMMdd-HHmmss-fff))}
 if(-not(Test-Path -LiteralPath $ExecutablePath)){throw 'Build with scripts/build.ps1 -Verification first.'}

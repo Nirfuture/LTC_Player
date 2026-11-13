@@ -31,13 +31,14 @@ public partial class MainWindow
  internal void PlayManual(CueRow row){if(CanManualOutput&&row.Enabled)_ = Safe(()=>PlayManualAsync(row,true));}
  internal void StopManual(){if(CanManualOutput)_ = Safe(()=>Preview.StopAsync());}
  async Task PlayManualAsync(CueRow row,bool restart){
+  StartupMeasurementTrace.Mark("play_request");
   if(closing||busy||!playback.ManualAvailable||Surface.Canvas.SharedDeviceError<0)return;
   if(armed&&(!CanManualOutput||!row.Enabled))return;
   await StopSyncPreviewAsync();if(!playback.ManualAvailable)return;
   bool same=previewCue==row.CueId&&string.Equals(Preview.LoadedPath,row.FilePath,StringComparison.OrdinalIgnoreCase);
   previewSelection=row;rebinding=true;try{Grid.SelectedItem=row;}finally{rebinding=false;}
   if(!playback.UsesSharedAudio&&!armed)Preview.AllowAudioForNextPlay();
-  if(restart||!same){previewCue=row.CueId;CancelScrub();await Preview.LoadAsync(row.FilePath);}
+  if(restart||!same){previewCue=row.CueId;CancelScrub();if(!await Preview.LoadAsync(row.FilePath))return;}
   if(LtcHasPriority||Preview.Armed){await UpdateAutoPreviewAsync();return;}
   if(!restart&&same&&Preview.Snapshot.State==PreviewState.Playing)await Preview.PauseAsync();else await Preview.PlayAsync();
   UpdateRowControls();
@@ -52,6 +53,7 @@ public partial class MainWindow
  void TickStatus()
  {
   UpdateAudioUi();
+  if(armed&&Surface.Ready&&Surface.Canvas.OutputDisconnected)_ = Safe(HandleOutputDisconnectedAsync);
   if(Surface.Ready&&Surface.Canvas.SharedDeviceError<0)_ = Safe(HandleSharedGraphicsFailureAsync);
   var clock=monitor.Clock.Read();Control<TextBlock>("LtcLabel").Text=clock.Label;
   Control<TextBlock>("LtcLabel").Opacity=clock.State is SyncState.LOST or SyncState.ERROR?.45:1;
@@ -74,14 +76,14 @@ public partial class MainWindow
    Control<TextBlock>("PreviewName").Text=t.CueId.HasValue?CueName(t.CueId):"再生待機";
    SetPreviewTimes(t.FramePts,cue?.Duration,cue?.FrameRate??0);
    Control<TextBlock>("RunInfo").Text=$"LTC同期 · スキップフレーム数 {t.Skipped}";
-   UpdatePreviewNotice(t.Warning);
+   UpdatePreviewNotice(t.Warning.StartsWith("映像がLTCから")||t.Warning.StartsWith("準備待ち:")||t.Warning.Contains("LTCの現在位置へ再同期中")?"":t.Warning);
   }else{
    Control<TextBlock>("PreviewName").Text=manualState.Name==""?"キューを選択してください":manualState.Name;
    SetPreviewTimes(manualState.Position,manualState.Duration,Preview.FrameRate);
    Control<TextBlock>("RunInfo").Text=manualState.State switch{PreviewState.Playing=>"手動再生",PreviewState.Paused=>"手動再生 · 一時停止",PreviewState.Stopped=>"手動再生 · 停止",PreviewState.Ended=>"手動再生 · 終了",_=>""};
    UpdatePreviewNotice(manualState.State==PreviewState.Error?manualState.Notice:"");
   }
-  UpdateRowControls();UpdatePreviewGeometry();
+  UpdateTimingStatus();UpdateRowControls();UpdatePreviewGeometry();
  }
  void UpdateDeliveryButton()
  {
@@ -181,7 +183,7 @@ public partial class MainWindow
    if(next.CoverPath!=old.CoverPath)coverLoadWarning="";
    Control<NumericUpDown>("FadeSeconds").Value=(decimal)next.FadeSeconds;
    if(Editor.Rate!=mode){Editor.Rate=mode;Editor.Validate();}
-   UpdatePreviewGeometry();StatusMessage("設定を適用しました。");
+   UpdateResponsiveLayout();StatusMessage("設定を適用しました。");
   }catch(Exception failure){
    if(inputAttempted){try{await monitor.ConfigureAsync(old,restoredClock:previousClock);}catch(Exception rollback){throw new AggregateException("設定の適用とLTC入力の復旧に失敗しました。設定を再確認してください。",failure,rollback);}}
    throw;

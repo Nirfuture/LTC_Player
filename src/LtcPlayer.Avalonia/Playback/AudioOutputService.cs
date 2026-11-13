@@ -3,6 +3,7 @@ namespace LtcPlayer.App;
 public enum SharedAudioState { Off,Waiting,Preparing,Playing,Muted,Resyncing,NoAudio,Error }
 public sealed record SharedAudioSnapshot(SharedAudioState State,string Notice,string DeviceId,Guid SinkSession,Guid CueId,int Generation,double TargetPts,double? PlayedPts,double? ErrorSeconds,int PreparationStarts,int Reseeks,int DroppedBlocks,int BufferedBlocks,uint HardwarePadding,float RateRatio,float AppliedGain)
 {
+    public double HostSeconds{get;init;}=MasterClock.Timestamp();
     public static SharedAudioSnapshot Off{get;}=new(SharedAudioState.Off,"","",Guid.Empty,Guid.Empty,0,0,null,null,0,0,0,0,0,1,0);
 }
 
@@ -93,13 +94,13 @@ public sealed class AudioOutputService : IAsyncDisposable
                     if(config.Version!=applied)
                     {
                         Close();applied=config.Version;faulted=-1;policy=new();
-                        if(config.Enabled){sink=new(config.DeviceId);sinkSession=Guid.NewGuid();sink.SetStreamGain(hardwareSilence?0:config.Muted?0:config.Volume);}
+                        if(config.Enabled){StartupMeasurementTrace.Mark("audio_device_init_begin");sink=new(config.DeviceId);sinkSession=Guid.NewGuid();sink.SetStreamGain(hardwareSilence?0:config.Muted?0:config.Volume);StartupMeasurementTrace.Mark("audio_device_init_complete");}
                         Publish(config.Enabled?SharedAudioState.Waiting:SharedAudioState.Off,"");config.Applied.TrySetResult();
                     }
                     if(!config.Enabled||faulted==config.Version){stop.Token.WaitHandle.WaitOne(3);continue;}
                     var source=readPlayhead();double now=MasterClock.Timestamp(),target=source.Estimate(now);
                     sink!.SetStreamGain(hardwareSilence?0:config.Muted?0:config.Volume);
-                    if(!source.Usable(now)||target>=source.Duration)
+                    if(!source.CanPrepare(now)||target>=source.Duration)
                     {
                         ResetSource();Publish(SharedAudioState.Waiting,source.Notice,source);stop.Token.WaitHandle.WaitOne(3);continue;
                     }
@@ -108,15 +109,17 @@ public sealed class AudioOutputService : IAsyncDisposable
                     {
                         ResetSource();identity=key;policy=new();
                         var file=new FileInfo(source.Path);var fileKey=(file.FullName,file.Length,file.LastWriteTimeUtc);
+                        StartupMeasurementTrace.Mark("audio_analysis_begin",note:cache.ContainsKey(fileKey)?"cache hit":"cache miss");
                         if(cache.TryGetValue(fileKey,out info))inspection=Task.FromResult(info);
                         else{inspectionCancel=CancellationTokenSource.CreateLinkedTokenSource(stop.Token);inspection=AudioMediaInfo.InspectAsync(source.Path,inspectionCancel.Token);}
                     }
                     if(info==null)
                     {
                         if(!inspection!.IsCompleted){Publish(SharedAudioState.Preparing,"音声を解析中",source);stop.Token.WaitHandle.WaitOne(3);continue;}
-                        info=inspection.GetAwaiter().GetResult();CancelInspection();
+                        info=inspection.GetAwaiter().GetResult();StartupMeasurementTrace.Mark("audio_analysis_complete",note:"worker observed completion");CancelInspection();
                         var file=new FileInfo(source.Path);if(cache.Count>=2)cache.Remove(cache.Keys.First());cache[(file.FullName,file.Length,file.LastWriteTimeUtc)]=info;
                     }
+                    StartupMeasurementTrace.Once("audio_analysis_available",note:"cached results bypass completion branch");
                     if(!info.Supported){Publish(SharedAudioState.NoAudio,info.Notice,source);stop.Token.WaitHandle.WaitOne(4);continue;}
                     if(decode==null)BeginDecode(source,target);
                     if(decode==null){Publish(SharedAudioState.Waiting,"音声終端",source);stop.Token.WaitHandle.WaitOne(3);continue;}
@@ -124,8 +127,10 @@ public sealed class AudioOutputService : IAsyncDisposable
                     decode.Ready.GetAwaiter().GetResult();
                     // Recheck the supplier before any staged samples reach WASAPI.
                     var latest=readPlayhead();now=MasterClock.Timestamp();target=latest.Estimate(now);
-                    if(!latest.Usable(now)||(latest.SessionId,latest.CueId,latest.Generation,latest.Path)!=key){ResetSource();continue;}
+                    if(!latest.CanPrepare(now)||(latest.SessionId,latest.CueId,latest.Generation,latest.Path)!=key){ResetSource();continue;}
                     source=latest;
+                    // Prepared PCM stays in the bounded decode queue until the clock advances.
+                    if(!source.Usable(now)){Publish(SharedAudioState.Preparing,"再生開始を待機中",source);stop.Token.WaitHandle.WaitOne(3);continue;}
                     if(!epochStarted)
                     {
                         int budget=16;
@@ -152,7 +157,9 @@ public sealed class AudioOutputService : IAsyncDisposable
                     now=MasterClock.Timestamp();target=source.Estimate(now);
                     if(!running&&stats.Padding>0&&target>=origin)
                     {
+                        StartupMeasurementTrace.Mark("audio_start_request",origin+stats.ConsumedSeconds);
                         sink.SetRunning(true);running=true;
+                        StartupMeasurementTrace.Mark("audio_start_complete",origin+stats.ConsumedSeconds,"WASAPI Start returned");
                         lead=Math.Clamp((MasterClock.Timestamp()-prepareAt)+.025,.1,.5);
                     }
                     if(running)
