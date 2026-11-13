@@ -1,31 +1,34 @@
 # LTC Player
 
-外部から受信したLTCに合わせて動画を再生し、指定したディスプレイへ出力するWindows用プレイヤーです。
+LTC Playerは、LTC（音声タイムコード）に合わせて動画を再生し、外部ディスプレイへ映像を出力するWindows用ツールです。複数の動画をキューに登録し、動画ごとに再生を開始するタイムコードを指定できます。
 
-MP4/H.264、MOV/HAP・HAP Qに対応しています。動画ごとに開始タイムコードを設定し、受信したLTCに応じて映像を切り替えます。
+MP4/H.264、MOV/HAP・HAP Qに対応しています。
+
+> 画像挿入位置：メイン画面全体（現行UIで更新）
 
 ## ダウンロード
 
-[ダウンロードページ](https://github.com/Nirfuture/LTC_Player/releases)
+**Windows版 ZIP · 0.1.0-preview.11（公開準備中）**
 
-Windows 11 x64対応。現在はプレビュー版です。使用する環境で事前に動作を確認してください。
+<!-- preview.11公開後、上記を実行用ZIPへの直リンクに変更する。 -->
+
+Windows 11 x64用・プレビュー版。
+
+[更新内容](RELEASE_NOTES.md)
 
 ## 使い方
 
 - [クイックスタート](docs/QUICKSTART.md)
+- [操作ガイド](docs/USER_GUIDE.md)
 - [対応環境・ファイル形式](docs/COMPATIBILITY.md)
 - [困ったとき](docs/TROUBLESHOOTING.md)
 
 ## 開発・仕様
 
 - [資料・構成の案内](docs/README.md)
-- [ビルド手順](docs/BUILD.md)
-- [リリース作成](docs/RELEASING.md)
-- [詳細仕様](docs/FINAL_SPEC.md)
-- [一括検証](docs/VERIFICATION.md)
 
 ## ライセンス
 
 アプリ本体はMITライセンス、libltcを使用する音声DLLはLGPLです。LucideアイコンはISC、一部の元アイコンはMITです。
 
-詳細は[LICENSE](LICENSE)、[NOTICE.md](NOTICE.md)、[LICENSES](LICENSES)を参照してください。
+[LICENSE](LICENSE) · [NOTICE](NOTICE.md) · [依存ライセンス](LICENSES)

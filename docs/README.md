@@ -1,6 +1,6 @@
 # 資料・構成の案内
 
-利用者向け：[クイックスタート](QUICKSTART.md)・[対応環境](COMPATIBILITY.md)・[困ったとき](TROUBLESHOOTING.md)。
+利用者向け：[クイックスタート](QUICKSTART.md)・[操作ガイド](USER_GUIDE.md)・[対応環境](COMPATIBILITY.md)・[困ったとき](TROUBLESHOOTING.md)。
 
 開発：[現行仕様](FINAL_SPEC.md)・[ビルド](BUILD.md)・[検証](VERIFICATION.md)・[リリース作成](RELEASING.md)。
 

@@ -72,4 +72,6 @@ MANIFEST.jsonに記録されたコミットへバージョンのタグを付け�
 
 Smart App Controlによる起動ブロックの制約を、リリースノートに記載します。詳しくは[配布方針](DISTRIBUTION.md)を参照してください。
 
-実行用ZIPの資料は`package-release.ps1`の明示リストに限定します。利用者向けREADMEは`docs/DISTRIBUTION_README.md`です。旧仕様・進捗・画像・開発資料はソースZIPにのみ収録します。
+実行用ZIPの資料は`package-release.ps1`の明示リストに限定します。利用者向けREADMEは`docs/DISTRIBUTION_README.md`です。操作ガイドは`docs/USER_GUIDE.md`を同梱します。画像を挿入する際は、その画像も明示リストへ追加します。旧仕様・進捗・画像・開発資料はソースZIPにのみ収録します。
+
+公開後は、リポジトリREADMEのWindows版ZIP直リンク・版番号・更新内容リンクを、実際に公開した版へ揃えます。未公開候補のリンクへ先に変更しません。
