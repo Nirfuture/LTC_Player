@@ -39,9 +39,9 @@
 
 ## 動作確認の範囲
 
-現在はプレビュー版です。preview.11では2台のPCで開始時間を計測し、会社PCでは外部ディスプレイの物理切断・再接続を限定的に確認しています。これらはpreview.10の検証範囲とは区別します。
+現在はプレビュー版です。preview.11では2台のPCで開始時間を計測、外部ディスプレイの物理切断・再接続も限定的に確認しています。
 
-実LTC機器、2時間以上の連続稼働、物理画面と出音の同期精度は未確認です。各版の確認範囲は[確認記録](releases/0.1.0-preview.11.md)、開始時間は[会社PC](https://github.com/Nirfuture/LTC_Player/blob/v0.1.0-preview.11/docs/STARTUP_CHECK_COMPANY_PC.md)・[別PC](https://github.com/Nirfuture/LTC_Player/blob/v0.1.0-preview.11/docs/STARTUP_CHECK_LOCAL_PC.md)を参照してください。
+2時間以上の連続稼働、物理画面と出音の同期精度は未確認です。各版の確認範囲は[確認記録](releases/0.1.0-preview.11.md)、開始時間は[会社PC](https://github.com/Nirfuture/LTC_Player/blob/v0.1.0-preview.11/docs/STARTUP_CHECK_COMPANY_PC.md)・[別PC](https://github.com/Nirfuture/LTC_Player/blob/v0.1.0-preview.11/docs/STARTUP_CHECK_LOCAL_PC.md)を参照してください。
 
 次の環境・機能も未検証です。
 
