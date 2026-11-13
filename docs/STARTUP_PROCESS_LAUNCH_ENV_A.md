@@ -1,5 +1,6 @@
-# 会社PC：FFmpegプロセス起動だけの小規模診断
+# 検証環境A：FFmpegプロセス起動だけの小規模診断
 
+環境A/Bは測定環境を識別するための名称です。端末構成・測定条件・対象コミットは各節に記載しています。
 2026-11-13。対象ソース：fix/preview10-display-disconnect、f2d9ce7f101c2b756b774a4743e2ef45dbb0f735。作業開始時のGitツリーはクリーン。
 
 ## 条件
@@ -20,14 +21,14 @@
 
 FFmpeg：
 
-- 検索された絶対パス：`C:\Users\izumi\AppData\Local\Microsoft\WinGet\Links\ffmpeg.exe`
-- リンク先実体：`C:\Users\izumi\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1-full_build\bin\ffmpeg.exe`
+- 検索された絶対パス：`C:/Users/<user>\AppData\Local\Microsoft\WinGet\Links\ffmpeg.exe`
+- リンク先実体：`C:/Users/<user>\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1-full_build\bin\ffmpeg.exe`
 - サイズ：223,360,000 bytes
 
 ffprobe：
 
-- 検索された絶対パス：`C:\Users\izumi\AppData\Local\Microsoft\WinGet\Links\ffprobe.exe`
-- リンク先実体：`C:\Users\izumi\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1-full_build\bin\ffprobe.exe`
+- 検索された絶対パス：`C:/Users/<user>\AppData\Local\Microsoft\WinGet\Links\ffprobe.exe`
+- リンク先実体：`C:/Users/<user>\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1-full_build\bin\ffprobe.exe`
 - サイズ：223,153,664 bytes
 
 ## 各回の結果（ms）
@@ -74,13 +75,13 @@ ffprobe：
 ## まだ分からないこと・次の候補
 
 - OS、セキュリティ検査、実行ファイル／その配置・検索経路、スケジューリング等のどれが支配的かは未分離。Boost無効やハードウェア不調とも断定しない。
-- 別PCのFFmpeg 6.0による4～12msは背景として受領した値で、今回同じexe／環境で比較していない。8.1という版の差が原因とは判断できない。
+- 検証環境BのFFmpeg 6.0による4～12msは背景として受領した値で、今回同じexe／環境で比較していない。8.1という版の差が原因とは判断できない。
 - 裸の名前ではなく同じ実体exeの絶対パスを指定する少数比較は、検索／リンク経路の切り分け候補。ただし今回は実施せず、設定変更・別版取得・ダウンロードも提案の実行もしていない。
 - 性能改善は未実装。BIOS、電源、セキュリティ設定、PATHは変更していない。全テスト・耐久試験・複数エージェントは使用していない。
 
 ## 成果物・Gitの扱い
 
-Git上の変更はこのレポートだけ。一時プログラムはリポジトリ外のwork/process-launch-probe-20261113、生データはリポジトリ外のoutputs/process-launch-company-20261113-v2.jsonに保存。初回の失敗記録もローカルに保持。これらのソース・生データ・生成バイナリをGitへ追加していない。commit・pushは行っていない。
+Git上の変更はこのレポートだけ。一時プログラムはリポジトリ外のwork/process-launch-probe-20261113、生データはリポジトリ外のoutputs/process-launch-env-a-20261113-v2.jsonに保存。初回の失敗記録もローカルに保持。これらのソース・生データ・生成バイナリをGitへ追加していない。commit・pushは行っていない。
 
 ## 追加：裸の名前と実体exe絶対パスの交互比較（2026-11-13）
 
@@ -104,11 +105,11 @@ SDK 10.0.203 / runtime 10.0.7、-version、UseShellExecute=false、CreateNoWindo
 
 **実体exeの絶対パスを指定しても、約500msの待ちは減らなかった。** この6回では、裸の名前の検索やWinGetリンク経由だけで説明する結果ではない。どちらも遅いことからOS・セキュリティ検査・実行ファイル・スケジューリング等の原因を断定はしない。3回ずつの小規模比較であり、同一値や同等性能を統計的に証明するものでもない。
 
-既存の未追跡レポートを保護して本節だけ追記。一時プログラムの変更と生データprocess-launch-company-alternating-20261113.jsonは引き続きリポジトリ外。設定変更、ダウンロード、性能改修、追加の調査、commit・pushは実施せず、ここで停止した。
+既存の未追跡レポートを保護して本節だけ追記。一時プログラムの変更と生データprocess-launch-env-a-alternating-20261113.jsonは引き続きリポジトリ外。設定変更、ダウンロード、性能改修、追加の調査、commit・pushは実施せず、ここで停止した。
 
 ## 追加：FFmpeg 2起動の逐次／並行比較（2026-11-13）
 
-開始時の既存変更docs/STARTUP_CHECK_COMPANY_PC.mdは保護し、変更していない。参照HEADはd8b0b8e。アプリへの変更・ビルド・動画再生はせず、既存の一時コンソールだけを調整した。予備なしでA→B→A→B→A→Bの計6組、FFmpeg計12起動を1回だけ実施。回数の自動追加なし。
+開始時の既存変更docs/STARTUP_CHECK_ENV_A.mdは保護し、変更していない。参照HEADはd8b0b8e。アプリへの変更・ビルド・動画再生はせず、既存の一時コンソールだけを調整した。予備なしでA→B→A→B→A→Bの計6組、FFmpeg計12起動を1回だけ実施。回数の自動追加なし。
 
 ### 条件と計測方法
 
@@ -166,4 +167,4 @@ Start位置は、その組の最初のStart直前を0とした差。番号1/2は
 - この結果は既存のアプリ内の約490ms／約980msの差と整合するが、OS・セキュリティ検査・ランタイム内部・実行ファイル・スケジューリング等の具体的な原因を特定したものではない。アプリのPCM準備を直接再測定したものでもない。
 - 各方式3組、予備なし、固定順、同一PC／exeの小規模診断。OSキャッシュや背景負荷を統制しておらず、一般的な性能保証や統計的な同等性の証明には使わない。
 
-生ログはリポジトリ外outputs/process-launch-company-paired-20261113.json。一時コード・生成バイナリもリポジトリ外に保持しGitへ追加していない。アプリ改修、設定変更、ダウンロード、全テスト、複数エージェント、追加調査、commit・pushを行わず、本測定で停止した。
+生ログはリポジトリ外outputs/process-launch-env-a-paired-20261113.json。一時コード・生成バイナリもリポジトリ外に保持しGitへ追加していない。アプリ改修、設定変更、ダウンロード、全テスト、複数エージェント、追加調査、commit・pushを行わず、本測定で停止した。

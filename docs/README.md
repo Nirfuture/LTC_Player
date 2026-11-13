@@ -16,9 +16,9 @@
 
 ## 現在の調査記録
 
-- [会社PCの開始計測](STARTUP_CHECK_COMPANY_PC.md)
-- [別PC比較](STARTUP_CHECK_LOCAL_PC.md)
-- [会社PCのプロセス起動診断](STARTUP_PROCESS_LAUNCH_COMPANY_PC.md)
+- [検証環境Aの開始計測](STARTUP_CHECK_ENV_A.md)
+- [検証環境Bとの比較](STARTUP_CHECK_ENV_B.md)
+- [検証環境Aのプロセス起動診断](STARTUP_PROCESS_LAUNCH_ENV_A.md)
 - [引き継ぎ時点の記録](HANDOFF_2026-11-13.md)（以後の結果は上記を参照）
 
 [旧資料の案内](history/README.md)・[各版の確認記録](releases)。生成物、端末設定、生ログはGitへ追加しない。
